@@ -1,0 +1,15 @@
+*.ipynb_checkpoints/
+.vscode/
+
+checkpoints/
+models/r18/
+datasets/
+
+feature_extractor/checkpoint
+log/
+results/
+venv/
+
+tmp*
+*__pycache__
+*.pyc
