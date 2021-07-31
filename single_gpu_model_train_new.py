@@ -424,7 +424,9 @@ def epoch_train(args, model, seq, device, dname, finetune=False):
                 'layers': args.layers,
                 'multi_head': args.multi_attn,
                 'diff_edge': args.diff_edge,
-                'state_dict': model.state_dict()
+                'state_dict': model.state_dict(),
+                'epoch': epoch_count,
+                'optim': optimizer.state_dict()
             }
             save_name = "checkpoint_" + dname + str(epoch+1) + '_epoch.pth'
             torch.save(checkpoint, os.path.join(args.save_dir,
