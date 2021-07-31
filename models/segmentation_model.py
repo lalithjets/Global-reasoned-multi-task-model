@@ -8,7 +8,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.nn import functional as F
-from torch.nn.functional import upsample
+#from torch.nn.functional import upsample
+from torch.nn.functional import interpolate
 from typing import Type, Any, Callable, Union, List, Optional
 
 def get_gaussian_filter(kernel_size=3, sigma=2, channels=3):
@@ -682,7 +683,7 @@ class GCNet_Decoder(nn.Module):
         outputs = []
         for i in range(len(x)):
             outputs.append(
-                upsample(x[i], imsize, mode='bilinear', align_corners=True))
+                interpolate(x[i], imsize, mode='bilinear', align_corners=True))
         return tuple(outputs)
 
 

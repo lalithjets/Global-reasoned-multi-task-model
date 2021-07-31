@@ -39,7 +39,7 @@ class SurgicalSceneDataset(Dataset):
         self.is_train = istrain
         self.feature_extractor = feature_extractor
         self.reduce_size = reduce_size
-        self.resizer = transforms.Compose([transforms.Scale((320, 400))])#512, 640
+        self.resizer = transforms.Compose([transforms.Resize((320, 400))])#512, 640
 
         self.xml_dir_list = []
         self.dset = []
