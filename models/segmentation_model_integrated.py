@@ -403,11 +403,11 @@ class Namespace:
 
 
 def resnet18_8s_model_cbs(pretrained=True, root='~/.encoding/models', **kwargs):
-    args = Namespace(alg='res', batch_size=1, cbs_epoch=3, checkpointfile='checkpoint/incremental/testing', cuda=True,
+    args = Namespace(alg='res', batch_size=1, cbs_epoch=2, checkpointfile='checkpoint/incremental/testing', cuda=True,
                      decay=0.0001, dist_loss='ce', dist_loss_act='softmax', dist_ratio=0.5, epoch_base=30, epoch_finetune=15,
                      fil1='LOG', fil2='gau', fil3='gau', ft_lr_factor=0.1, gamma=0.8, kernel_size=3, lr=0.001, memory_size=50, momentum=0.6,
                      num_class_novel=[0, 9, 11], num_classes=8, period_train=2, save_model=False,
-                     schedule_interval=3, std=1.0, std_factor=0.99, stop_acc=0.998, tnorm=3.0, use_cbs=True,
+                     schedule_interval=3, std=1.0, std_factor=0.985, stop_acc=0.998, tnorm=3.0, use_cbs=True,
                      use_ls=False, use_tnorm=True)
 
     model = Resnet18_8s_CBS(args, num_classes=8)
@@ -582,16 +582,38 @@ class GCN(nn.Module):
 
     def __init__(self, num_state, num_node, bias=False):
         super(GCN, self).__init__()
+        self.num_node = num_node
         self.conv1 = nn.Conv1d(num_node, num_node, kernel_size=1, padding=0,
                                stride=1, groups=1, bias=True)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv1d(num_state, num_state, kernel_size=1, padding=0,
                                stride=1, groups=1, bias=bias)
 
-    def forward(self, x):
+        #self.scene_feat_c1d1 = nn.Conv1d(num_node, num_node, kernel_size=1, padding=0,
+                               #stride=1, groups=1, bias=True)
+        self.scene_feat_c1d1 = nn.Conv1d(1, 1, kernel_size=1, padding=0,
+                               stride=1, groups=1, bias=True)
+        self.h_avg_pool = nn.AvgPool1d(128,1)
+
+    def forward(self, x, scene_feat=None):
         # (n, num_state, num_node) -> (n, num_node, num_state)
         #                          -> (n, num_state, num_node)
-        h = self.conv1(x.permute(0, 2, 1).contiguous()).permute(0, 2, 1)
+        
+        scene_feat = self.scene_feat_c1d1(scene_feat)
+        h = torch.matmul(self.h_avg_pool(x.permute(0, 2, 1).contiguous()), scene_feat)
+        h = x.permute(0, 2, 1).contiguous() + h
+        h = self.conv1(h).permute(0, 2, 1)
+        
+        #scene_feat = self.scene_feat_c1d1(scene_feat.repeat(1, 64, 1))
+        #h = x.permute(0, 2, 1).contiguous() + scene_feat
+        #h = self.conv1(h).permute(0, 2, 1)
+
+        #h = self.conv1(x.permute(0, 2, 1).contiguous()).permute(0, 2, 1)
+        #if scene_feat is not None:
+            #scene_feat = scene_feat.repeat(1, self.num_node, 1)
+            #h = h + x + scene_feat.permute(0,2,1)
+        #else: h = h + x
+
         h = h + x
         h = self.relu(h)
         h = self.conv2(h)
@@ -620,23 +642,24 @@ class GloRe_Unit(nn.Module):
 
         self.blocker = nn.BatchNorm2d(num_in)
 
-    def forward(self, x):
+    def forward(self, x, scene_feat = None):
         '''
         :param x: (n, c, h, w)
         '''
+    
         batch_size = x.size(0)
 
         # (n, num_in, h, w) --> (n, num_state, h, w)
         #                   --> (n, num_state, h*w)
-        x_state_reshaped = self.conv_state(x).view(batch_size, self.num_s, -1)
+        x_state_reshaped = self.conv_state(x).view(batch_size, self.num_s, -1)      # Omega(x)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
-        x_proj_reshaped = self.conv_proj(x).view(batch_size, self.num_n, -1)
+        x_proj_reshaped = self.conv_proj(x).view(batch_size, self.num_n, -1)        # theta(X)
 
         # (n, num_in, h, w) --> (n, num_node, h, w)
         #                   --> (n, num_node, h*w)
-        x_rproj_reshaped = x_proj_reshaped
+        x_rproj_reshaped = x_proj_reshaped                                          # reverse projection matrix
 
         # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -645,9 +668,12 @@ class GloRe_Unit(nn.Module):
         x_n_state = torch.matmul( x_state_reshaped, x_proj_reshaped.permute(0, 2, 1))
         x_n_state = x_n_state * (1. / x_state_reshaped.size(2))
 
+
         # (n, num_state, num_node) -> (n, num_node, num_state)
         #                          -> (n, num_state, num_node)
-        x_n_rel = self.gcn(x_n_state)
+        x_n_rel = self.gcn(x_n_state, scene_feat)                                               # interaction_space output
+
+
 
         # reverse projection: instance space -> pixel space
         # (n, num_state, num_node) x (n, num_node, h*w) --> (n, num_state, h*w)
@@ -660,7 +686,7 @@ class GloRe_Unit(nn.Module):
 
         # -----------------
         # final
-        out = x + self.blocker(self.fc_2(x_state))
+        out = x + self.blocker(self.fc_2(x_state))                                      # fc2: extend_dim
 
         return out
 
@@ -720,15 +746,25 @@ class GCN_Unit(nn.Module):
         self.conv51 = nn.Sequential(nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
                                     norm_layer(inter_channels),
                                     nn.ReLU())
+        #self.scene_feat_conv = nn.Conv1d(1, 1, 12, stride=4)
+        #self.scene_feat_avgpool = nn.AdaptiveAvgPool1d(128)
+        self.scene_feat_lin =nn.Linear(1024, 128)
 
-        self.gcn = nn.Sequential(OrderedDict([("GCN%02d" % i,
-                                             GloRe_Unit(
-                                                 inter_channels, 64, kernel=1)
-                                               ) for i in range(1)]))
+        #self.gcn = nn.Sequential(OrderedDict([("GCN%02d" % i,
+        #                                     GloRe_Unit(
+        #                                         inter_channels, 64, kernel=1)
+        #                                       ) for i in range(1)]))
+        self.gcn = GloRe_Unit(inter_channels, 64, kernel=1)
 
-    def forward(self, x):
+    def forward(self, x, scene_feat=None):
+        
         feat = self.conv51(x)
-        feat = self.gcn(feat)
+        if scene_feat is not None:
+            #scene_feat = self.scene_feat_conv(scene_feat)
+            #scene_feat = self.scene_feat_avgpool(scene_feat)
+            scene_feat = self.scene_feat_lin(scene_feat)
+        
+        feat = self.gcn(feat, scene_feat)
 
         return feat
 

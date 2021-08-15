@@ -25,6 +25,7 @@ class mtl_model(nn.Module):
         self.seg_decoder = seg_decoder
         self.scene_graph = scene_graph
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.scene_feat_avgpool = nn.AdaptiveAvgPool1d(1)
         self.transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
 
     def forward(self, img, img_dir, det_boxes_all, node_num, spatial_feat, word2vec, roi_labels, validation=False):
@@ -59,11 +60,26 @@ class mtl_model(nn.Module):
             
         # f is False for the GCNET seg pipeline
         seg_inputs = self.feature_encoder(img, f=False)
+
+        #print('node_num', node_num)
+        # graph su model
+        interaction, scene_feat = self.scene_graph(node_num, gsu_node_feat, spatial_feat, word2vec, roi_labels, validation= validation)
+        
+        edge_sum = 0
+        batch_scene_feat = None
+        for n in node_num:
+            active_edges = n-1 if n >1 else n
+            if batch_scene_feat == None:
+                batch_scene_feat = self.scene_feat_avgpool(scene_feat[edge_sum:edge_sum+active_edges, :].unsqueeze(0).permute(0,2,1)).permute(0,2,1)
+            else:
+                batch_scene_feat = torch.cat((batch_scene_feat, self.scene_feat_avgpool(scene_feat[edge_sum:edge_sum+active_edges, :].unsqueeze(0).permute(0,2,1)).permute(0,2,1)))
+            edge_sum += active_edges
+        #print(batch_scene_feat.shape)
+        # glore and decoder
         #seg_inputs = nn.functional.interpolate(seg_inputs, size=imsize, mode='bilinear', align_corners=True)
-        seg_inputs = self.gcn_unit(seg_inputs)
+        seg_inputs = self.gcn_unit(seg_inputs, batch_scene_feat)
         seg_inputs = self.seg_decoder(seg_inputs, imsize)[0]
 
-        # graph su model
-        interaction = self.scene_graph(node_num, gsu_node_feat, spatial_feat, word2vec, roi_labels, validation= validation)
+        
         return interaction, seg_inputs
         # return fe_feature, interaction

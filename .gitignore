@@ -4,6 +4,7 @@
 checkpoints/
 models/r18/
 datasets/
+old_deprecated/
 
 feature_extractor/checkpoint
 log/

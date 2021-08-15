@@ -74,8 +74,8 @@ class CONFIGURATION(object):
                 self.G_E_BN            = bn       # false
                 self.G_E_D             = dropout  # 0.3
                 self.G_E_c_std         = 1.0
-                self.G_E_c_std_factor  = 0.99      # 0.985 (LOG), 0.95 (gau)
-                self.G_E_c_epoch       = 3         # 20
+                self.G_E_c_std_factor  = 0.985      # 0.985 (LOG), 0.95 (gau)
+                self.G_E_c_epoch       = 2         # 20
                 self.G_E_c_kernel_size = 3
                 self.G_E_c_filter      = 'LOG' # 'gau', 'LOG'
 
@@ -414,10 +414,11 @@ class Predictor(nn.Module):
 
     def forward(self, edge):
         feat = torch.cat([edge.dst['new_n_f'], edge.dst['new_n_f_lang'], edge.data['s_f'], edge.src['new_n_f_lang'], edge.src['new_n_f']], dim=1)
+        scene_feat = torch.cat([edge.dst['new_n_f'], edge.src['new_n_f']], dim=1)
         pred = self.classifier(feat)
         # if the criterion is BCELoss, you need to uncomment the following code
         # output = self.sigmoid(output)
-        return {'pred': pred}
+        return {'pred': pred, 'scene_feat': scene_feat}
 
 
 class AGRNN(nn.Module):
@@ -550,7 +551,8 @@ class AGRNN(nn.Module):
         
         if self.training or validation:
             # !NOTE: cannot use "batch_readout_h_o_e_list+batch_readout_h_h_e_list" because of the wrong order
-            return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred']
+            return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred'], \
+                    batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['scene_feat']
         else:
             return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred'], \
                    batch_graph.nodes[batch_h_node_list].data['alpha'], \

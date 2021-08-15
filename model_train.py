@@ -66,7 +66,7 @@ def build_model(args, load_pretrained = True):
     '''==== graph model ===='''
     # graph model
     scene_graph = AGRNN(bias=True, bn=False, dropout=0.3, multi_attn=False, layer=1, diff_edge=False, use_cbs=args.use_cbs)
-    #if args.use_cbs: scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(0)
+    if args.use_cbs: scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(0)
 
     # graph load pre-trained weights
     if load_pretrained:
@@ -77,7 +77,7 @@ def build_model(args, load_pretrained = True):
     '''==== Feature extractor ===='''
     # feature extraction model
     seg_model = get_gcnet(backbone='resnet18_8s_model_cbs')
-    #if args.use_cbs: seg_model.pretrained.get_new_kernels(0)
+    if args.use_cbs: seg_model.pretrained.get_new_kernels(0)
 
     # # based on cuda
     # num_gpu = torch.cuda.device_count()
@@ -89,8 +89,8 @@ def build_model(args, load_pretrained = True):
     # feature_encoder.load_state_dict(torch.load(args.fe_modelpath))
     # feature_encoder = feature_encoder.module
 
-    # if args.use_cbs: print("Using CBS")
-    # else: print("Not Using CBS")
+    if args.use_cbs: print("Using CBS")
+    else: print("Not Using CBS")
 
     model = mtl_model(seg_model.pretrained, scene_graph, seg_model.gcn_block, seg_model.decoder)
     model.to(torch.device('cpu'))
@@ -190,7 +190,7 @@ def train_model(gpu, args):
 
     # Priority rank given to node 0, current pc, more node means multiple PC
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '8892'
+    os.environ['MASTER_PORT'] = '8892' #8892
     rank = args.nr * args.gpus + gpu
     dist.init_process_group(backend='nccl', init_method='env://', world_size=args.world_size, rank=rank)
 
@@ -239,14 +239,15 @@ def train_model(gpu, args):
         train_seg_loss = 0.0
         train_scene_graph_loss = 0.0
 
-        # optimizer with decaying lr
-        decay_lr = decay_lr*0.95 if ((epoch_count+1) %20 == 0) else decay_lr        
-        optimizer = optim.Adam(model.parameters(), lr=decay_lr, weight_decay=0)
+        if args.use_cbs and epoch_count<30: 
+            model.module.feature_encoder.get_new_kernels(epoch_count)
+            model.module.scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(epoch_count)
+            model.cuda()
 
-        # E-cbs
-        #if args.use_cbs:
-        #    model.module.scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(epoch_count)
-        #    model = model.cuda()
+        # optimizer with decaying lr
+        #decay_lr = decay_lr*0.98 if ((epoch_count+1) %20 == 0) else decay_lr        
+        decay_lr = decay_lr*0.98 if ((epoch_count+1) %10 == 0) else decay_lr        
+        optimizer = optim.Adam(model.parameters(), lr=decay_lr, weight_decay=0)
 
         train_sampler.set_epoch(epoch_count)
 
@@ -272,14 +273,13 @@ def train_model(gpu, args):
             # forward_propagation
             interaction, seg_outputs = model(seg_img, img_loc, det_boxes, node_num, spatial_feat, word2vec, roi_labels)
 
-            # loss and acc calculation
-            # loss and accuracy
-            #if args.use_t: interaction = interaction / args.t_scale
+            # loss calculation
             seg_loss = seg_criterion(seg_outputs, seg_masks)
             scene_graph_loss = graph_scene_criterion(interaction, edge_labels.float())
             #acc = np.sum(np.equal(np.argmax(interaction.cpu().data.numpy(), axis=-1), np.argmax(edge_labels.cpu().data.numpy(), axis=-1)))
 
-            loss_total = seg_loss + scene_graph_loss  # ADDING BOTH THE LOSSES IN A NAIVE WAY
+            loss_total = (0.6 * seg_loss) + (0.4 * scene_graph_loss)  # ADDING BOTH THE LOSSES IN A NAIVE WAY
+            #loss_total = seg_loss + scene_graph_loss  # ADDING BOTH THE LOSSES IN A NAIVE WAY
             optimizer.zero_grad()
             loss_total.backward()
             optimizer.step()
@@ -303,7 +303,7 @@ def train_model(gpu, args):
 
         if gpu == 0:
             end_time = time.time()
-            print("Train Epoch: {}/{} lr: {:0.4f}  Graph_loss: {:0.4f} Segmentation_Loss: {:0.4f} Execution time: {:0.4f}".format(\
+            print("Train Epoch: {}/{} lr: {:0.9f}  Graph_loss: {:0.4f} Segmentation_Loss: {:0.4f} Execution time: {:0.4f}".format(\
                     epoch_count + 1, args.epoch, decay_lr, train_scene_graph_loss, train_seg_loss, (end_time-start_time)))
 
             #if epoch_count % 2 == 0:
@@ -337,14 +337,12 @@ def train_model(gpu, args):
             print("Best SC ACC: [Epoch: {} value: {:0.4f}] Best SC mAP: [Epoch: {} value: {:0.4f}] Best Seg mIuU: [Epoch: {} value: {:0.4f}]".format(\
                     best_epoch[0], best_value[0], best_epoch[1], best_value[1], best_epoch[2], best_value[2]))
 
-            
-
     return
 
 
 if __name__ == "__main__":
 
-    ver = 'mtl_test'
+    ver = 'mtl_base_eCBS'
     f_e = 'resnet18_11_cbs_ts'      # f_e = 'resnet18_09_cbs_ts' # CHECK
 
     # os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
@@ -354,12 +352,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MTL Scene graph and segmentation')
 
     # hyper parameters
-    parser.add_argument('--lr',                 type=float,     default = 0.0000085)
-    parser.add_argument('--epoch',              type=int,       default = 101)
+    parser.add_argument('--lr',                 type=float,     default = 0.00001)#0.0000085)
+    parser.add_argument('--epoch',              type=int,       default = 51)
     parser.add_argument('--start_epoch',        type=int,       default = 0)
     parser.add_argument('--batch_size',         type=int,       default = 4)
     parser.add_argument('--gpu',                type=bool,      default = True)
-    parser.add_argument('--print_every',        type=int,       default = 10)
+    #parser.add_argument('--print_every',        type=int,       default = 10)
     parser.add_argument('--train_model',        type=str,       default = 'epoch')
     parser.add_argument('--exp_ver',            type=str,       default = ver)
 
@@ -382,8 +380,8 @@ if __name__ == "__main__":
     parser.add_argument('--diff_edge',          type=bool,      default = False)
 
     # feature_encoder_modelpath
-    parser.add_argument('--fe_modelpath',       type=str,       default = 'feature_extractor/checkpoint/incremental/inc_ResNet18_cbs_ts_0_012345678.pkl')
-    parser.add_argument('--fe_imgnet_path',       type=str,     default = 'models/r18/resnet18-f37072fd.pth')
+    #parser.add_argument('--fe_modelpath',       type=str,       default = 'feature_extractor/checkpoint/incremental/inc_ResNet18_cbs_ts_0_012345678.pkl')
+    #parser.add_argument('--fe_imgnet_path',       type=str,     default = 'models/r18/resnet18-f37072fd.pth')
 
     # data_processing
     parser.add_argument('--sampler',            type=int,       default = 0)
@@ -391,16 +389,12 @@ if __name__ == "__main__":
     parser.add_argument('--feature_extractor',  type=str,       default = f_e)
 
     # CBS
-    parser.add_argument('--use_cbs',            type=bool,      default = False)
-
-    # temperature_scaling
-    parser.add_argument('--use_t',              type=bool,      default = False)
-    parser.add_argument('--t_scale',            type=float,     default = 1.5)
+    parser.add_argument('--use_cbs',            type=bool,      default = True)
 
     # gpu distributor
-    parser.add_argument('--nodes',              type=int,       default = 1,    metavar='N',    help='number of data loading workers (default: 4)')
-    parser.add_argument('--gpus',               type=int,       default = num_gpu,                help='number of gpus per node')
-    parser.add_argument('--nr',                 type=int,       default = 0,                      help='ranking within the nodes')
+    parser.add_argument('--nodes',              type=int,       default = 1,        metavar='N',    help='number of data loading workers (default: 4)')
+    parser.add_argument('--gpus',               type=int,       default = num_gpu,                  help='number of gpus per node')
+    parser.add_argument('--nr',                 type=int,       default = 0,                        help='ranking within the nodes')
 
     args = parser.parse_args()
 

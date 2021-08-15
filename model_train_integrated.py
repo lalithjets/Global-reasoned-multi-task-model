@@ -1,8 +1,8 @@
+from functools import lru_cache
 import os
 import copy
 import time
 
-import cv2
 import argparse
 import numpy as np
 from tqdm import tqdm
@@ -10,19 +10,18 @@ from PIL import Image
 
 
 import torch
-import torchvision
 import torch.nn as nn
 from torch import optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 #from tensorboardX import SummaryWriter
 
 
 # from models.feature_encoder import *
-from models.scene_graph import *
+from models.mtl_model_integrated import *
+from models.scene_graph_integrated import *
 from models.surgicalDataset import *
-from models.segmentation_model import get_gcnet  # for the get_gcnet function
+from models.segmentation_model_integrated import get_gcnet  # for the get_gcnet function
 
 import utils.io as io
 from utils.vis_tool import vis_img
@@ -30,10 +29,10 @@ from utils.scene_graph_eval_matrix import *
 from utils.segmentation_eval_matrix import *  # SegmentationLoss and Eval code
 
 
-# import torch.multiprocessing as mp
-# import torch.distributed as dist
-# from torch.nn.parallel import DistributedDataParallel as DDP
-# #from torch.cuda import amp
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 
 
 def seed_everything(seed=27):
@@ -55,64 +54,9 @@ def seg_eval_batch(seg_output, target):
     return correct, labeled, inter, union, loss
 
 
-class mtl_model(nn.Module):
-    '''
-    Multi-task model : Graph Scene Understanding and segmentation
-    Forward uses features from feature_extractor
-    '''
-
-    def __init__(self, feature_encoder, scene_graph, seg_gcn_block, seg_decoder):
-        super(mtl_model, self).__init__()
-        self.feature_encoder = feature_encoder
-        self.gcn_unit = seg_gcn_block
-        self.seg_decoder = seg_decoder
-        self.scene_graph = scene_graph
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
-
-    def forward(self, img, img_dir, det_boxes_all, node_num, spatial_feat, word2vec, roi_labels, validation=False):
-
-        #fe_feature = None
-        gsu_node_feat = None
-        seg_inputs = None
-        imsize = img.size()[2:]
-        
-        # feature extraction model
-        for index, img_loc in enumerate(img_dir):
-            _img = Image.open(img_loc).convert('RGB')
-            _img = np.array(_img)
-            img_stack = None
-            for bndbox in det_boxes_all[index]:
-                roi = np.array(bndbox).astype(int)
-                roi_image = _img[roi[1]:roi[3] + 1, roi[0]:roi[2] + 1, :]
-                roi_image = self.transform(cv2.resize(roi_image, (224, 224), interpolation=cv2.INTER_LINEAR))
-                roi_image = torch.autograd.Variable(roi_image.unsqueeze(0))
-                # stack nodes images per image
-                img_stack = roi_image if img_stack == None else torch.cat((img_stack, roi_image))
-
-            img_stack = img_stack.cuda(non_blocking=True)
-            img_stack = self.feature_encoder(img_stack, f=True)
-            img_stack = self.avgpool(img_stack)
-
-            # prepare FE
-            # fe_feature = img_stack if fe_feature == None else torch.cat((fe_feature, img_stack))
-
-            # prepare graph node features
-            gsu_node_feat = img_stack.view(img_stack.size(0), -1) if gsu_node_feat == None else torch.cat((gsu_node_feat, img_stack.view(img_stack.size(0), -1)))
-        
-        # f is False for the GCNET seg pipeline
-        seg_inputs = self.feature_encoder(img, f=False)
-        seg_inputs = nn.functional.upsample(seg_inputs, size=imsize, mode='bilinear', align_corners=True)
-        seg_inputs = self.gcn_unit(seg_inputs)
-        seg_inputs = self.seg_decoder(seg_inputs, imsize)[0]
-
-        # graph su model
-        interaction = self.scene_graph(node_num, gsu_node_feat, spatial_feat, word2vec, roi_labels, validation= validation)
-        return interaction, seg_inputs
-        # return fe_feature, interaction
 
 
-def build_model(args, pretrained_model = True):
+def build_model(args, load_pretrained = True):
     '''
     Build MTL model
     1) Feature Extraction
@@ -122,10 +66,10 @@ def build_model(args, pretrained_model = True):
     '''==== graph model ===='''
     # graph model
     scene_graph = AGRNN(bias=True, bn=False, dropout=0.3, multi_attn=False, layer=1, diff_edge=False, use_cbs=args.use_cbs)
-    #if args.use_cbs: scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(0)
+    if args.use_cbs: scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(0)
 
     # graph load pre-trained weights
-    if pretrained_model:
+    if load_pretrained:
         pretrained_model = torch.load(args.gsu_checkpoint)
         scene_graph.load_state_dict(pretrained_model['state_dict'])
     # scene_graph.eval().eval()
@@ -133,7 +77,7 @@ def build_model(args, pretrained_model = True):
     '''==== Feature extractor ===='''
     # feature extraction model
     seg_model = get_gcnet(backbone='resnet18_8s_model_cbs')
-    #if args.use_cbs: seg_model.pretrained.get_new_kernels(0)
+    if args.use_cbs: seg_model.pretrained.get_new_kernels(0)
 
     # # based on cuda
     # num_gpu = torch.cuda.device_count()
@@ -145,8 +89,8 @@ def build_model(args, pretrained_model = True):
     # feature_encoder.load_state_dict(torch.load(args.fe_modelpath))
     # feature_encoder = feature_encoder.module
 
-    # if args.use_cbs: print("Using CBS")
-    # else: print("Not Using CBS")
+    if args.use_cbs: print("Using CBS")
+    else: print("Not Using CBS")
 
     model = mtl_model(seg_model.pretrained, scene_graph, seg_model.gcn_block, seg_model.decoder)
     model.to(torch.device('cpu'))
@@ -225,23 +169,30 @@ def model_eval(model, validation_dataloader):
     mIoU = IoU.mean()
 
     print('================= Evaluation ====================')
-    print('Graph        :  acc: %0.4f  map: %0.4f recall: %0.4f}' % (scene_graph_total_acc, scene_graph_map_value, scene_graph_recall))
+    print('Graph        :  acc: %0.4f  map: %0.4f recall: %0.4f  loss: %0.4f}' % (scene_graph_total_acc, scene_graph_map_value, scene_graph_recall, scene_graph_total_loss))
     print('Segmentation : Pacc: %0.4f mIoU: %0.4f   loss: %0.4f}' % (pixAcc, mIoU, test_seg_loss/len(validation_dataloader)))
+    return(scene_graph_total_acc, scene_graph_map_value, mIoU)
 
 
 def train_model(gpu, args):
+    best_value = [0.0, 0.0, 0.0]
+    best_epoch = [0, 0, 0]
+
+    # for decaying lr
+    decay_lr = args.lr
+
     '''
     training MTL model
     '''
 
     # this is placed above the dist.init process, possibility because of the feature_extraction model.
-    model = build_model(args, pretrained_model=False)
+    model = build_model(args, load_pretrained=False)
 
     # Priority rank given to node 0, current pc, more node means multiple PC
-    # os.environ['MASTER_ADDR'] = 'localhost'
-    # os.environ['MASTER_PORT'] = '8892'
-    # rank = args.nr * args.gpus + gpu
-    # dist.init_process_group(backend='nccl', init_method='env://', world_size=args.world_size, rank=rank)
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '8897' #8892
+    rank = args.nr * args.gpus + gpu
+    dist.init_process_group(backend='nccl', init_method='env://', world_size=args.world_size, rank=rank)
 
     # fix seeds and set cuda
     seed_everything()  # seed all random
@@ -249,13 +200,12 @@ def train_model(gpu, args):
 
     # Wrap the model with ddp
     model.cuda()
-    # model = DDP(model, device_ids=[gpu], find_unused_parameters=True)#, find_unused_parameters=True)
+    model = DDP(model, device_ids=[gpu], find_unused_parameters=True)#, find_unused_parameters=True)
 
     # define loss function (criterion) and optimizer
     seg_criterion = SegmentationLosses(se_loss=False, aux=False, nclass=8, se_weight=0.2, aux_weight=0.2).cuda(gpu)
     graph_scene_criterion = nn.MultiLabelSoftMarginLoss().cuda(gpu)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=0)
-
+    
     # train and test dataloader
     train_seq = [[2, 3, 4, 6, 7, 9, 10, 11, 12, 14, 15]]
     val_seq = [[1, 5, 16]]
@@ -275,8 +225,9 @@ def train_model(gpu, args):
 
     # train_dataset distributed to 2 GPU
     train_dataset = SurgicalSceneDataset(seq_set=seq['train_seq'], data_dir=seq['data_dir'],
-                                         img_dir=seq['img_dir'], mask_dir=seq['mask_dir'], dset=seq['dset'], istrain=False, dataconst=data_const,
-                                         feature_extractor=args.feature_extractor, reduce_size=True)
+                                         img_dir=seq['img_dir'], mask_dir=seq['mask_dir'], dset=seq['dset'], istrain=True, dataconst=data_const,
+                                         feature_extractor=args.feature_extractor, reduce_size=False)
+    print(len(train_dataset))
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=rank, shuffle=True)
     train_dataloader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=0, pin_memory=True, sampler=train_sampler)
 
@@ -287,28 +238,27 @@ def train_model(gpu, args):
 
         train_seg_loss = 0.0
         train_scene_graph_loss = 0.0
-        
-        #running_acc = 0.0
-        #running_edge_count = 0
 
-        #idx = 0
-        #total_inter, total_union, total_correct, total_label = 0, 0, 0, 0
-        #idx = 0
+        if args.use_cbs and epoch_count<30: 
+            model.module.feature_encoder.get_new_kernels(epoch_count)
+            model.module.scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(epoch_count)
+            model.cuda()
 
-        # E-cbs
-        #if args.use_cbs:
-        #    model.module.scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(epoch_count)
-        #    model = model.cuda()
+        # optimizer with decaying lr
+        #decay_lr = decay_lr*0.98 if ((epoch_count+1) %20 == 0) else decay_lr        
+        decay_lr = decay_lr*0.98 if ((epoch_count+1) %10 == 0) else decay_lr        
+        optimizer = optim.Adam(model.parameters(), lr=decay_lr, weight_decay=0)
 
         train_sampler.set_epoch(epoch_count)
 
+        if gpu == 0: print('================= Train ====================')
         #tbar = tqdm(train_dataloader)
         #for i, data in enumerate(tbar):
         for data in tqdm(train_dataloader):
             # model.zero_grad()
             seg_img = data['img']
             seg_masks = data['mask']
-            img_name = data['img_name']
+            #img_name = data['img_name']
             img_loc = data['img_loc']
             node_num = data['node_num']
             roi_labels = data['roi_labels']
@@ -323,14 +273,13 @@ def train_model(gpu, args):
             # forward_propagation
             interaction, seg_outputs = model(seg_img, img_loc, det_boxes, node_num, spatial_feat, word2vec, roi_labels)
 
-            # loss and acc calculation
-            # loss and accuracy
-            #if args.use_t: interaction = interaction / args.t_scale
+            # loss calculation
             seg_loss = seg_criterion(seg_outputs, seg_masks)
             scene_graph_loss = graph_scene_criterion(interaction, edge_labels.float())
             #acc = np.sum(np.equal(np.argmax(interaction.cpu().data.numpy(), axis=-1), np.argmax(edge_labels.cpu().data.numpy(), axis=-1)))
 
-            loss_total = 0.5*seg_loss + 0.5*scene_graph_loss  # ADDING BOTH THE LOSSES IN A NAIVE WAY
+            loss_total = (0.6 * seg_loss) + (0.4 * scene_graph_loss)  # ADDING BOTH THE LOSSES IN A NAIVE WAY
+            #loss_total = seg_loss + scene_graph_loss  # ADDING BOTH THE LOSSES IN A NAIVE WAY
             optimizer.zero_grad()
             loss_total.backward()
             optimizer.step()
@@ -354,10 +303,10 @@ def train_model(gpu, args):
 
         if gpu == 0:
             end_time = time.time()
-            print('================= Train ====================')
-            print("Train Epoch: {}/{} Graph_loss: {:0.4f} Segmentation_Loss: {:0.4f} Execution time: {:0.4f}".format(\
-                    epoch_count + 1, args.epoch, train_scene_graph_loss, train_seg_loss, (end_time-start_time)))
+            print("Train Epoch: {}/{} lr: {:0.9f}  Graph_loss: {:0.4f} Segmentation_Loss: {:0.4f} Execution time: {:0.4f}".format(\
+                    epoch_count + 1, args.epoch, decay_lr, train_scene_graph_loss, train_seg_loss, (end_time-start_time)))
 
+            #if epoch_count % 2 == 0:
             # save model
             # if epoch_loss<0.0405 or epoch_count % args.save_every == (args.save_every - 1):
             checkpoint = {
@@ -374,15 +323,26 @@ def train_model(gpu, args):
 
             save_name = "checkpoint_D1" + str(epoch_count+1) + '_epoch.pth'
             torch.save(checkpoint, os.path.join(args.save_dir, args.exp_ver, 'epoch_train', save_name))
-
-            model_eval(model, val_dataloader)
+            
+            eval_sc_acc, eval_sc_map, eval_seg_miou = model_eval(model, val_dataloader)
+            if eval_sc_acc > best_value[0]:
+                best_value[0] = eval_sc_acc
+                best_epoch[0] = epoch_count+1
+            if eval_sc_map > best_value[1]:
+                best_value[1] = eval_sc_map
+                best_epoch[1] = epoch_count+1
+            if eval_seg_miou > best_value[2]:
+                best_value[2] = eval_seg_miou
+                best_epoch[2] = epoch_count+1
+            print("Best SC ACC: [Epoch: {} value: {:0.4f}] Best SC mAP: [Epoch: {} value: {:0.4f}] Best Seg mIuU: [Epoch: {} value: {:0.4f}]".format(\
+                    best_epoch[0], best_value[0], best_epoch[1], best_value[1], best_epoch[2], best_value[2]))
 
     return
 
 
 if __name__ == "__main__":
 
-    ver = 'mtl_test'
+    ver = 'mtl_v4_base'
     f_e = 'resnet18_11_cbs_ts'      # f_e = 'resnet18_09_cbs_ts' # CHECK
 
     # os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
@@ -392,12 +352,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MTL Scene graph and segmentation')
 
     # hyper parameters
-    parser.add_argument('--lr',                 type=float,     default = 0.000001)
-    parser.add_argument('--epoch',              type=int,       default = 80)
+    parser.add_argument('--lr',                 type=float,     default = 0.00001)#0.0000085)
+    parser.add_argument('--epoch',              type=int,       default = 101)
     parser.add_argument('--start_epoch',        type=int,       default = 0)
-    parser.add_argument('--batch_size',         type=int,       default = 2)
+    parser.add_argument('--batch_size',         type=int,       default = 4)
     parser.add_argument('--gpu',                type=bool,      default = True)
-    parser.add_argument('--print_every',        type=int,       default = 10)
+    #parser.add_argument('--print_every',        type=int,       default = 10)
     parser.add_argument('--train_model',        type=str,       default = 'epoch')
     parser.add_argument('--exp_ver',            type=str,       default = ver)
 
@@ -420,8 +380,8 @@ if __name__ == "__main__":
     parser.add_argument('--diff_edge',          type=bool,      default = False)
 
     # feature_encoder_modelpath
-    parser.add_argument('--fe_modelpath',       type=str,       default = 'feature_extractor/checkpoint/incremental/inc_ResNet18_cbs_ts_0_012345678.pkl')
-    parser.add_argument('--fe_imgnet_path',       type=str,     default = 'models/r18/resnet18-f37072fd.pth')
+    #parser.add_argument('--fe_modelpath',       type=str,       default = 'feature_extractor/checkpoint/incremental/inc_ResNet18_cbs_ts_0_012345678.pkl')
+    #parser.add_argument('--fe_imgnet_path',       type=str,     default = 'models/r18/resnet18-f37072fd.pth')
 
     # data_processing
     parser.add_argument('--sampler',            type=int,       default = 0)
@@ -431,14 +391,10 @@ if __name__ == "__main__":
     # CBS
     parser.add_argument('--use_cbs',            type=bool,      default = False)
 
-    # temperature_scaling
-    parser.add_argument('--use_t',              type=bool,      default = False)
-    parser.add_argument('--t_scale',            type=float,     default = 1.5)
-
-    # # gpu distributor
-    # parser.add_argument('--nodes',              type=int,       default = 1,    metavar='N',    help='number of data loading workers (default: 4)')
-    # parser.add_argument('--gpus',               type=int,       default = num_gpu,                help='number of gpus per node')
-    # parser.add_argument('--nr',                 type=int,       default = 0,                      help='ranking within the nodes')
+    # gpu distributor
+    parser.add_argument('--nodes',              type=int,       default = 1,        metavar='N',    help='number of data loading workers (default: 4)')
+    parser.add_argument('--gpus',               type=int,       default = num_gpu,                  help='number of gpus per node')
+    parser.add_argument('--nr',                 type=int,       default = 0,                        help='ranking within the nodes')
 
     args = parser.parse_args()
 
@@ -446,9 +402,8 @@ if __name__ == "__main__":
     data_const = SurgicalSceneConstants()
 
     # GPU distributed
-    # args.world_size = args.gpus * args.nodes
+    args.world_size = args.gpus * args.nodes
 
     # train model in distributed set
     # trainfunction, no of gpus, arguments
-    # mp.spawn(train_model, nprocs=args.gpus, args=(args,))
-    train_model(0, args)
+    mp.spawn(train_model, nprocs=args.gpus, args=(args,))
