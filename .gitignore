@@ -11,6 +11,8 @@ log/
 results/
 venv/
 
+sai_transfer/
+
 tmp*
 *__pycache__
 *.pyc

@@ -1,3 +1,12 @@
+'''
+Project         : Global-Reasoned Multi-Task Surgical Scene Understanding
+Lab             : MMLAB, National University of Singapore
+contributors    : Lalithkumar Seenivasan, Sai Mitheran, Mobarakol Islam, Hongliang Ren
+Note            : Code adopted and modified from Visual-Semantic Graph Attention Networks and Dual attention network for scene segmentation
+
+'''
+
+
 import os
 import sys
 import random
@@ -14,6 +23,9 @@ from torch.utils.data import Dataset
 
 
 class SurgicalSceneConstants():
+    '''
+    Set the instrument classes and action classes, with path to XML and Word2Vec Features (if applicable)
+    '''
     def __init__(self):
         self.instrument_classes = ('kidney', 'bipolar_forceps', 'prograsp_forceps', 'large_needle_driver',
                                    'monopolar_curved_scissors', 'ultrasound_probe', 'suction', 'clip_applier',
@@ -23,12 +35,15 @@ class SurgicalSceneConstants():
                                'Tool_Manipulation', 'Cutting', 'Cauterization',
                                'Suction', 'Looping', 'Suturing', 'Clipping', 'Staple',
                                'Ultrasound_Sensing')
+
         self.xml_data_dir = 'datasets/instruments18/seq_'
         self.word2vec_loc = 'datasets/surgicalscene_word2vec.hdf5'
 
 
 class SurgicalSceneDataset(Dataset):
     '''
+    Dataset class for the MTL Model
+    Inputs: sequence set, data directory (root), image directory, mask directory, augmentation flag (istrain), dataset (dset), feature extractor chosen
     '''
     def __init__(self, seq_set, data_dir, img_dir, mask_dir, istrain, dset, dataconst, feature_extractor, reduce_size=False):
 
@@ -39,7 +54,9 @@ class SurgicalSceneDataset(Dataset):
         self.is_train = istrain
         self.feature_extractor = feature_extractor
         self.reduce_size = reduce_size
-        self.resizer = transforms.Compose([transforms.Resize((320, 400))])#512, 640
+
+        # Images and masks are resized to (320, 400)
+        self.resizer = transforms.Compose([transforms.Resize((320, 400))]) 
 
         self.xml_dir_list = []
         self.dset = []
@@ -57,7 +74,7 @@ class SurgicalSceneDataset(Dataset):
                 self.dset.append(dset[domain])
         self.word2vec = h5py.File('datasets/surgicalscene_word2vec.hdf5', 'r')
 
-    # word2vec
+    # Word2Vec function
     def _get_word2vec(self, node_ids, sgh=0):
         word2vec = np.empty((0, 300))
         for node_id in node_ids:
@@ -68,9 +85,11 @@ class SurgicalSceneDataset(Dataset):
             word2vec = np.vstack((word2vec, vec))
         return word2vec
 
+    # Dataset length
     def __len__(self):
         return len(self.xml_dir_list)
 
+    # Function to get images and masks 
     def __getitem__(self, idx):
 
         file_name = os.path.splitext(os.path.basename(self.xml_dir_list[idx]))[0]
@@ -128,10 +147,11 @@ class SurgicalSceneDataset(Dataset):
         return data
 
 
-# for DatasetLoader
+# For Dataset Loader
 def collate_fn(batch):
     '''
         Default collate_fn(): https://github.com/pytorch/pytorch/blob/1d53d0756668ce641e4f109200d9c65b003d05fa/torch/utils/data/_utils/collate.py#L43
+        Inputs: Data Batch
     '''
     batch_data = {}
     batch_data['img_name'] = []

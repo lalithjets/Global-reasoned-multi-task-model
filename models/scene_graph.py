@@ -1,3 +1,18 @@
+'''
+Project         : Global-Reasoned Multi-Task Surgical Scene Understanding
+Lab             : MMLAB, National University of Singapore
+contributors    : Lalithkumar Seenivasan, Sai Mitheran, Mobarakol Islam, Hongliang Ren
+Note            : Code adopted and modified from Visual-Semantic Graph Attention Networks and Dual attention network for scene segmentation
+                        Visual-Semantic Graph Network:
+                        @article{liang2020visual,
+                          title={Visual-Semantic Graph Attention Networks for Human-Object Interaction Detection},
+                          author={Liang, Zhijun and Rojas, Juan and Liu, Junfa and Guan, Yisheng},
+                          journal={arXiv preprint arXiv:2001.02302},
+                          year={2020}
+                        }
+'''
+
+
 import dgl
 import math
 import numpy as np
@@ -10,9 +25,8 @@ import torch.nn.functional as F
 
 from collections import OrderedDict
 
-
 '''
-configurations of the network
+Configurations of the network
     
     readout: G_ER_L_S = [1024+300+16+300+1024,  1024, 117]
 
@@ -37,14 +51,15 @@ class CONFIGURATION(object):
     gnn_attn          : fc_size, activation, bias, bn, droupout
     gnn_attn_for_lang : fc_size, activation, bias, bn, droupout
     '''
-    def __init__(self, layer=1, bias=True, bn=False, dropout=0.2, multi_attn=False):
+    def __init__(self, layer=1, bias=True, bn=False, dropout=0.2, multi_attn=False, global_feat = 0):
         
         # if multi_attn:
         if True:
             if layer==1:
                 feature_size = 512
+                additional_sf = global_feat
                 # readout
-                self.G_ER_L_S = [feature_size+300+16+300+feature_size, feature_size, 13]
+                self.G_ER_L_S = [feature_size+300+16+additional_sf+300+feature_size, feature_size, 13]
                 self.G_ER_A   = ['ReLU', 'Identity']
                 self.G_ER_B   = bias    #true
                 self.G_ER_BN  = bn      #false
@@ -68,16 +83,13 @@ class CONFIGURATION(object):
                 # self.G_N_GRU2 = feature_size
 
                 # gnn edge function1
-                self.G_E_L_S           = [feature_size*2+16, feature_size]
+                self.G_E_L_S           = [feature_size*2+16+additional_sf, feature_size]
                 self.G_E_A             = ['ReLU']
                 self.G_E_B             = bias     # true
                 self.G_E_BN            = bn       # false
                 self.G_E_D             = dropout  # 0.3
-                self.G_E_c_std         = 1.0
-                self.G_E_c_std_factor  = 0.99      # 0.985 (LOG), 0.95 (gau)
-                self.G_E_c_epoch       = 3         # 20
-                self.G_E_c_kernel_size = 3
-                self.G_E_c_filter      = 'LOG' # 'gau', 'LOG'
+                # self.G_E_c_kernel_size = 3
+
 
                 # gnn edge function2 for language
                 self.G_E_L_S2 = [300*2, feature_size]
@@ -118,68 +130,10 @@ class CONFIGURATION(object):
         return model_config
 
 
-def get_gaussian_filter_1D(kernel_size=3, sigma=2, channels=3):
-    # Create a x, y coordinate grid of shape (kernel_size, kernel_size, 2)
-    
-    x_coord = torch.arange(kernel_size)
-    x_grid = x_coord.repeat(kernel_size).view(kernel_size, kernel_size)
-    y_grid = x_grid.t()
-
-    xy_grid = torch.stack([x_grid, y_grid], dim=-1).float()
-    mean = (kernel_size - 1)/2.
-    variance = sigma**2.
-    xy_grid = torch.sum((xy_grid[:kernel_size,:kernel_size,:] - mean)**2., dim=-1)
-
-    # Calculate the 1-dimensional gaussian kernel
-    gaussian_kernel = (1./((math.sqrt(2.*math.pi)*sigma))) * \
-                        torch.exp(-1* (xy_grid[int(kernel_size/2)]) / (2*variance))
-
-    gaussian_kernel = gaussian_kernel / torch.sum(gaussian_kernel)
-    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size)
-    gaussian_kernel = gaussian_kernel.repeat(channels, 1, 1)
-
-    padding = 1 if kernel_size==3 else 2 if kernel_size == 5 else 0
-    gaussian_filter = nn.Conv1d(in_channels=channels, out_channels=channels,
-                                kernel_size=kernel_size, groups=channels,
-                                bias=False, padding=padding)
-    gaussian_filter.weight.data = gaussian_kernel
-    gaussian_filter.weight.requires_grad = False 
-    return gaussian_filter
-
-
-def get_laplaceOfGaussian_filter_1D(kernel_size=3, sigma=2, channels=3):
-    
-    # Create a x, y coordinate grid of shape (kernel_size, kernel_size, 2)
-    x_coord = torch.arange(kernel_size)
-    x_grid = x_coord.repeat(kernel_size).view(kernel_size, kernel_size)
-    y_grid = x_grid.t()
-    xy_grid = torch.stack([x_grid, y_grid], dim=-1).float()
-    mean = (kernel_size - 1)/2.
-
-    used_sigma = sigma
-    # Calculate the 2-dimensional gaussian kernel which is
-    log_kernel = (-1./(math.pi*(used_sigma**4))) \
-                  * (1-(torch.sum((xy_grid[int(kernel_size/2)] - mean)**2., dim=-1) / (2*(used_sigma**2)))) \
-                  * torch.exp(-torch.sum((xy_grid[int(kernel_size/2)] - mean)**2., dim=-1) / (2*(used_sigma**2)))
-    
-    # Make sure sum of values in gaussian kernel equals 1.
-    log_kernel = log_kernel / torch.sum(log_kernel)
-    log_kernel = log_kernel.view(1, 1, kernel_size)
-    log_kernel = log_kernel.repeat(channels, 1, 1)
-
-    padding = 1 if kernel_size==3 else 2 if kernel_size == 5 else 0
-    log_filter = nn.Conv1d(in_channels=channels, out_channels=channels,
-                                kernel_size=kernel_size, groups=channels,
-                                bias=False, padding=padding)
-    log_filter.weight.data = log_kernel
-    log_filter.weight.requires_grad = False
-    return log_filter
-
-
 class Identity(nn.Module):
     '''
     Identity class activation layer
-    x = x
+    f(x) = x
     '''
     def __init__(self):
         super(Identity,self).__init__()
@@ -189,15 +143,16 @@ class Identity(nn.Module):
 
 def get_activation(name):
     '''
-    get_activation sub-function
-    argument: activatoin name (eg. ReLU, Identity, LeakyReLU)
+    get_activation function
+    argument: Activation name (eg. ReLU, Identity, Tanh, Sigmoid, LeakyReLU)
     '''
     if name=='ReLU': return nn.ReLU(inplace=True)
     elif name=='Identity': return Identity()
+    elif name=='Tanh': return nn.Tanh()
+    elif name=='Sigmoid': return nn.Sigmoid()
     elif name=='LeakyReLU': return nn.LeakyReLU(0.2,inplace=True)
     else: assert(False), 'Not Implemented'
-    #elif name=='Tanh': return nn.Tanh()
-    #elif name=='Sigmoid': return nn.Sigmoid()
+
 
 class MLP(nn.Module):
     '''
@@ -233,7 +188,7 @@ class MLP(nn.Module):
     
     def forward(self, x):
         for layer in self.layers:
-            # !NOTE: sometime the shape of x will be [1,N], and we cannot use batch-normailzation in that situation
+            # !NOTE: Sometime the shape of x will be [1,N], and we cannot use batch-normalization in that situation
             if self.bn and x.shape[0]==1:
                 x = layer[0](x)
                 x = layer[:-1](x)
@@ -242,48 +197,24 @@ class MLP(nn.Module):
         return x
 
 
-class H_H_EdgeApplyModule(nn.Module): #human to human edge
+class H_H_EdgeApplyModule(nn.Module): #Human to Human edge
     '''
         init    : config, multi_attn 
         forward : edge
     '''
-    def __init__(self, CONFIG, multi_attn=False, use_cbs = False):
-        super(H_H_EdgeApplyModule, self).__init__()
-        self.use_cbs = use_cbs
-        if use_cbs:
-            self.init_std = CONFIG.G_E_c_std 
-            self.cbs_std = CONFIG.G_E_c_std
-            self.cbs_std_factor = CONFIG.G_E_c_std_factor
-            self.cbs_epoch = CONFIG.G_E_c_epoch
-            self.cbs_kernel_size = CONFIG.G_E_c_kernel_size
-            self.cbs_filter = CONFIG.G_E_c_filter
-        
+    def __init__(self, CONFIG, multi_attn=False):
+        super(H_H_EdgeApplyModule, self).__init__()        
         self.edge_fc = MLP(CONFIG.G_E_L_S, CONFIG.G_E_A, CONFIG.G_E_B, CONFIG.G_E_BN, CONFIG.G_E_D)
         self.edge_fc_lang = MLP(CONFIG.G_E_L_S2, CONFIG.G_E_A2, CONFIG.G_E_B2, CONFIG.G_E_BN2, CONFIG.G_E_D2)
     
     def forward(self, edge):
         feat = torch.cat([edge.src['n_f'], edge.data['s_f'], edge.dst['n_f']], dim=1)
         feat_lang = torch.cat([edge.src['word2vec'], edge.dst['word2vec']], dim=1)
-        if self.use_cbs:
-            feat = self.kernel1(feat[:,None,:])
-            feat = torch.squeeze(feat, 1)
         e_feat = self.edge_fc(feat)
         e_feat_lang = self.edge_fc_lang(feat_lang)
   
         return {'e_f': e_feat, 'e_f_lang': e_feat_lang}
 
-    def get_new_kernels(self, epoch_count):
-        if self.use_cbs:
-            if epoch_count == 0:
-                self.cbs_std = self.init_std
-                
-            if epoch_count % self.cbs_epoch == 0 and epoch_count is not 0:
-                self.cbs_std *= self.cbs_std_factor
-            
-            if (self.cbs_filter == 'gau'): 
-                self.kernel1 = get_gaussian_filter_1D(kernel_size=self.cbs_kernel_size, sigma= self.cbs_std, channels= 1)
-            elif (self.cbs_filter == 'LOG'): 
-                self.kernel1 = get_laplaceOfGaussian_filter_1D(kernel_size=self.cbs_kernel_size, sigma= self.cbs_std, channels= 1)
 
 
 class H_NodeApplyModule(nn.Module): #human node
@@ -326,10 +257,10 @@ class GNN(nn.Module):
         init    : config, multi_attn, diff_edge
         forward : g, h_node, o_node, h_h_e_list, o_o_e_list, h_o_e_list, pop_features
     '''
-    def __init__(self, CONFIG, multi_attn=False, diff_edge=True, use_cbs = False):
+    def __init__(self, CONFIG, multi_attn=False, diff_edge=True):
         super(GNN, self).__init__()
         self.diff_edge = diff_edge # false
-        self.apply_h_h_edge = H_H_EdgeApplyModule(CONFIG, multi_attn, use_cbs)
+        self.apply_h_h_edge = H_H_EdgeApplyModule(CONFIG, multi_attn)
         self.apply_edge_attn1 = E_AttentionModule1(CONFIG)  
         self.apply_h_node = H_NodeApplyModule(CONFIG)
 
@@ -380,10 +311,10 @@ class GRNN(nn.Module):
         features, spatial_features, word2vec,
         valid, pop_features, initial_features
     '''
-    def __init__(self, CONFIG, multi_attn=False, diff_edge=True, use_cbs = False):
+    def __init__(self, CONFIG, multi_attn=False, diff_edge=True):
         super(GRNN, self).__init__()
         self.multi_attn = multi_attn #false
-        self.gnn = GNN(CONFIG, multi_attn, diff_edge, use_cbs)
+        self.gnn = GNN(CONFIG, multi_attn, diff_edge)
 
     def forward(self, batch_graph, batch_h_node_list, batch_obj_node_list, batch_h_h_e_list, batch_o_o_e_list, batch_h_o_e_list, feat, spatial_feat, word2vec, valid=False, pop_feat=False, initial_feat=False):
         
@@ -414,10 +345,11 @@ class Predictor(nn.Module):
 
     def forward(self, edge):
         feat = torch.cat([edge.dst['new_n_f'], edge.dst['new_n_f_lang'], edge.data['s_f'], edge.src['new_n_f_lang'], edge.src['new_n_f']], dim=1)
+        scene_feat = torch.cat([edge.dst['new_n_f'], edge.src['new_n_f'],edge.data['s_f']], dim=1)
         pred = self.classifier(feat)
-        # if the criterion is BCELoss, you need to uncomment the following code
+        # If the criterion is BCELoss, uncomment the following code ->
         # output = self.sigmoid(output)
-        return {'pred': pred}
+        return {'pred': pred, 'scene_feat': scene_feat}
 
 
 class AGRNN(nn.Module):
@@ -429,16 +361,16 @@ class AGRNN(nn.Module):
         node_num, features, spatial_features, word2vec, roi_label,
         validation, choose_nodes, remove_nodes
     '''
-    def __init__(self, bias=True, bn=True, dropout=None, multi_attn=False, layer=1, diff_edge=True, use_cbs = False):
+    def __init__(self, bias=True, bn=True, dropout=None, multi_attn=False, layer=1, diff_edge=True, global_feat = 0):
         super(AGRNN, self).__init__()
  
         self.multi_attn = multi_attn # false
         self.layer = layer           # 1 layer
         self.diff_edge = diff_edge   # false
         
-        self.CONFIG1 = CONFIGURATION(layer=1, bias=bias, bn=bn, dropout=dropout, multi_attn=multi_attn)
+        self.CONFIG1 = CONFIGURATION(layer=1, bias=bias, bn=bn, dropout=dropout, multi_attn=multi_attn, global_feat=global_feat)
 
-        self.grnn1 = GRNN(self.CONFIG1, multi_attn=multi_attn, diff_edge=diff_edge, use_cbs = use_cbs)
+        self.grnn1 = GRNN(self.CONFIG1, multi_attn=multi_attn, diff_edge=diff_edge)
         self.edge_readout = Predictor(self.CONFIG1)
         
     def _collect_edge(self, node_num, roi_label, node_space, diff_edge):
@@ -470,9 +402,6 @@ class AGRNN(nn.Module):
         # readout_edge_list, get corresponding readout edge in the graph
         src_box_list = np.arange(roi_label.shape[0])
         for dst in h_node_list:
-            # if dst == roi_label.shape[0]-1:
-            #    continue
-            # src_box_list = src_box_list[1:]
             for src in src_box_list:
                 if src not in h_node_list:
                     readout_edge_list.append((src, dst))
@@ -529,7 +458,7 @@ class AGRNN(nn.Module):
                 node_space = node_num_cum[i-1]
             graph, h_node_list, obj_node_list, h_h_e_list, o_o_e_list, h_o_e_list, readout_edge_list, readout_h_h_e_list, readout_h_o_e_list = self._build_graph(node_num[i], roi_label[i], node_space, diff_edge=self.diff_edge)
             
-            # updata batch
+            # update batch
             batch_graph.append(graph)
             batch_h_node_list += h_node_list
             batch_obj_node_list += obj_node_list
@@ -550,7 +479,8 @@ class AGRNN(nn.Module):
         
         if self.training or validation:
             # !NOTE: cannot use "batch_readout_h_o_e_list+batch_readout_h_h_e_list" because of the wrong order
-            return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred']
+            return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred'], \
+                    batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['scene_feat']
         else:
             return batch_graph.edges[tuple(zip(*batch_readout_edge_list))].data['pred'], \
                    batch_graph.nodes[batch_h_node_list].data['alpha'], \
