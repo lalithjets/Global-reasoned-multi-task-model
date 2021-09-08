@@ -1,4 +1,4 @@
-# Global-Reasoned Multi-Task Model for Surgical Scene Understanding and Instrument Segmentation
+# Global-Reasoned Multi-Task Model for Surgical Scene Understanding
 
 ---
 
@@ -41,7 +41,8 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 ---
 ### Dataset
 #### Download feature extracted data for training and evalutation
-1. MICCAI Endoscopic Vision Challenge 2018
+1. endovis challange 2018
+2. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `datasets/word2vec`.
 
 ### Training
 TBD
@@ -51,4 +52,7 @@ TBD
 
 ---
 ### Acknowledgement
-TBD
+Code adopted and modified from :
+1. Visual-Semantic Graph Attention Network for Human-Object Interaction Detecion
+    - Paper [Visual-Semantic Graph Attention Network for Human-Object Interaction Detecion](https://arxiv.org/abs/2001.02302).
+    - Official Pytorch implementation [code](https://github.com/birlrobotics/vs-gats).
