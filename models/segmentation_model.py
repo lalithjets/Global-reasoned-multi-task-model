@@ -318,14 +318,14 @@ class BaseNet(nn.Module):
     forward : x
 
     """
-    def __init__(self, nclass, backbone, dilated=True, norm_layer=None,
+    def __init__(self, nclass, backbone, pretrained, dilated=True, norm_layer=None,
                 root='~/.encoding/models', *args, **kwargs):
         super(BaseNet, self).__init__()
         self.nclass = nclass
 
         # Copying modules from pretrained models
         self.backbone = backbone
-        self.pretrained = get_backbone(backbone, pretrained=True, dilated=dilated,
+        self.pretrained = get_backbone(backbone, pretrained=pretrained, dilated=dilated,
                                        norm_layer=norm_layer, root=root,
                                        *args, **kwargs)
         self.pretrained.fc = None
@@ -393,14 +393,14 @@ def resnet18(pretrained: bool = True, progress: bool = True, **kwargs: Any) -> R
 class Resnet18_main(nn.Module):
     """
     ResNet main function for feature extractor
-    init    : num_classes
+    init    : pretrained, num_classes
     forward : x
     """
-    def __init__(self, num_classes=1000):
+    def __init__(self, pretrained, num_classes=1000):
 
         super(Resnet18_main, self).__init__()
         resnet18_block = resnet18(
-            pretrained=True)
+            pretrained=pretrained)
 
         resnet18_block.fc = nn.Conv2d(resnet18_block.inplanes, num_classes, 1)
 
@@ -584,8 +584,8 @@ class GR_Segmentation(BaseNet):
     forward : x (Not used in MTL forward pass)
 
     """   
-    def __init__(self, nclass, backbone, aux=False, se_loss=False, norm_layer=nn.BatchNorm2d, gcn_search=None, **kwargs):
-        super(GR_Segmentation, self).__init__(nclass, backbone, norm_layer=norm_layer, **kwargs)
+    def __init__(self, nclass, backbone, pretrained, aux=False, se_loss=False, norm_layer=nn.BatchNorm2d, gcn_search=None, **kwargs):
+        super(GR_Segmentation, self).__init__(nclass, backbone, pretrained, norm_layer=norm_layer, **kwargs)
 
         in_channels = 512
 
@@ -663,10 +663,10 @@ class GR_module(nn.Module):
         return feat1, feat2, feat3, feat4, feat5
 
 def resnet18_model(pretrained=True, root='~/.encoding/models', **kwargs):
-    model = Resnet18_main(num_classes=8)
+    model = Resnet18_main(pretrained, num_classes=8)
     return model
 
 
 def get_gcnet(dataset='endovis18', backbone='resnet18_model', num_classes=8, pretrained=False, root='./pretrain_models', **kwargs):
-    model = GR_Segmentation(nclass=num_classes, backbone=backbone, root=root, **kwargs)
+    model = GR_Segmentation(nclass=num_classes, backbone=backbone, pretrained=pretrained, root=root, **kwargs)
     return model

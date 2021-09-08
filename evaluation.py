@@ -1,6 +1,7 @@
 #from functools import lru_cache
 import os
 import time
+import json
 
 import argparse
 import numpy as np
@@ -20,14 +21,38 @@ from models.segmentation_model import get_gcnet  # for the get_gcnet function
 from utils.scene_graph_eval_matrix import *
 from utils.segmentation_eval_matrix import *  # SegmentationLoss and Eval code
 
+from tabulate import tabulate
 
 import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+import warnings
+warnings.filterwarnings('ignore')
+
+def label_to_index(lbl):
+    '''
+    Label to index mapping
+    Input: class label
+    Output: class index
+    '''
+    return torch.tensor(map_dict.index(lbl))
+
+
+def index_to_label(index):
+    '''
+    Index to label mapping
+    Input: class index
+    Output: class label
+    '''
+    return map_dict[index]
+
+
 
 def seed_everything(seed=27):
     '''
+    Set random seed for reproducible experiments
+    Inputs: seed number 
     '''
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -47,41 +72,35 @@ def seg_eval_batch(seg_output, target):
     return correct, labeled, inter, union, loss
 
 
-def build_model(args, load_pretrained = True):
+def build_model(args):
     '''
     Build MTL model
-    1) Feature Extraction
-    3) Graph Scene Understanding Model
+    1) Scene Graph Understanding Model
+    2) Segmentation Model : Encoder, Reasoning unit, Decoder
+
+    Inputs: args
     '''
 
-    '''==== graph model ===='''
+    '''==== Graph model ===='''
     # graph model
-    scene_graph = AGRNN(bias=True, bn=False, dropout=0.3, multi_attn=False, layer=1, diff_edge=False, use_cbs=args.use_cbs, global_feat=args.global_feat)
-    if args.use_cbs: scene_graph.grnn1.gnn.apply_h_h_edge.get_new_kernels(0)
-
-    # graph load pre-trained weights
-    if load_pretrained:
-        pretrained_model = torch.load(args.gsu_checkpoint)
-        scene_graph.load_state_dict(pretrained_model['state_dict'])
+    scene_graph = AGRNN(bias=True, bn=False, dropout=0.3, multi_attn=False, layer=1, diff_edge=False, global_feat=args.global_feat)
 
     # segmentation model
-    seg_model = get_gcnet(backbone='resnet18_8s_model_cbs')
-    if args.use_cbs: seg_model.pretrained.get_new_kernels(0)
-
-    model = mtl_model(seg_model.pretrained, scene_graph, seg_model.gcn_block, seg_model.decoder, seg_mode = args.seg_mode)
+    seg_model = get_gcnet(backbone='resnet18_model', pretrained=False)
+    model = mtl_model(seg_model.pretrained, scene_graph, seg_model.gr_interaction, seg_model.gr_decoder, seg_mode = args.seg_mode)
     model.to(torch.device('cpu'))
     return model
 
 
 
-def model_eval(model, validation_dataloader):
+def model_eval(model, validation_dataloader, nclass=8):
     '''
     Evaluate MTL
     '''
 
-    #frame_to_process = ['datasets/instruments18/seq_5/left_frames/frame123.png',
-    #                    'datasets/instruments18/seq_16/left_frames/frame135.png']
     model.eval()
+
+    class_values = np.zeros(nclass)
 
     # graph
     scene_graph_criterion = nn.MultiLabelSoftMarginLoss()
@@ -106,9 +125,6 @@ def model_eval(model, validation_dataloader):
         spatial_feat = data['spatial_feat']
         word2vec = data['word2vec']
         
-        #if img_loc[0] in frame_to_process:
-        #    print(img_loc)
-        #else: continue
         spatial_feat, word2vec, edge_labels = spatial_feat.cuda(non_blocking=True), word2vec.cuda(non_blocking=True), edge_labels.cuda(non_blocking=True)
         seg_img, seg_masks = seg_img.cuda(non_blocking=True), seg_masks.cuda(non_blocking=True)
 
@@ -118,8 +134,6 @@ def model_eval(model, validation_dataloader):
         scene_graph_logits_list.append(interaction)
         scene_graph_labels_list.append(edge_labels)
 
-        #print(np.argmax(edge_labels.cpu().data.numpy(), axis=-1))
-        #print(np.argmax(F.softmax(interaction, dim=1).cpu().data.numpy(), axis=-1))
         # loss and accuracy
         scene_graph_loss = scene_graph_criterion(interaction, edge_labels.float())
         scene_graph_acc = np.sum(np.equal(np.argmax(interaction.cpu().data.numpy(), axis=-1), np.argmax(edge_labels.cpu().data.numpy(), axis=-1)))
@@ -147,25 +161,63 @@ def model_eval(model, validation_dataloader):
     # segmentation evaluation
     pixAcc = 1.0 * total_correct / (np.spacing(1) + total_label)
     IoU = 1.0 * total_inter / (np.spacing(1) + total_union)
+    class_values += IoU
     mIoU = IoU.mean()
 
-    print('================= Evaluation ====================')
+    print('\n================= Evaluation ====================')
     print('Graph        :  acc: %0.4f  map: %0.4f recall: %0.4f  loss: %0.4f}' % (scene_graph_total_acc, scene_graph_map_value, scene_graph_recall, scene_graph_total_loss))
     print('Segmentation : Pacc: %0.4f mIoU: %0.4f   loss: %0.4f}' % (pixAcc, mIoU, test_seg_loss/len(validation_dataloader)))
+
+    print('\n================= Class-wise IoU ====================')
+    class_wise_IoU = []
+    m_vals = []
+    for idx, value in enumerate(class_values):
+        class_name = index_to_label(idx)
+        pair = [class_name, value]
+        m_vals.append(value)
+        class_wise_IoU.append(pair)
+
+    print("Mean Value: ", np.mean(np.array(m_vals)), "\n")
+
+    print(tabulate(class_wise_IoU,
+          headers=['Class', 'IoU'], tablefmt='orgtbl'))
+
     return(scene_graph_total_acc, scene_graph_map_value, mIoU)
 
 
 if __name__ == "__main__":
 
-    ver = 'amtl-t3g'
-    model_type = 'amtl-t3'
-    seg_mode = 'v1' # v1 or, can be 'v2_cgc' (Conv, GloRe, Conv) or 'v2_gc' (GloRe, Conv)
-    f_e = 'resnet18_11_cbs_ts'      # f_e = 'resnet18_09_cbs_ts' # CHECK
+    '''
+    Main function to set arguments
+    '''
 
+    # ---------------------------------------------- Optimization and feature sharing variants ----------------------------------------------
+    '''
+    Format for the model_type : X-Y 
+
+    -> X : Optimisation technique    [1. amtl - Sequential MTL Optimisation, 2. mtl - Naive MTL Optimisation]
+    -> Y : Feature Sharing mechanism [1. t0 - Base model,
+                                      2. t1 - Scene graph features to enhance segmentation (SGFSEG), 
+                                      3. t3 - Global interaction space features to improve scene graph (GISFSG)]
+
+    '''
+    model_type = 'amtl-t0'
+    ver = 'amtl_t0'
+    port = '8892'
+    f_e = 'resnet18_11_cbs_ts'
+
+
+    #  ----------------------------------------------Global reasoning variant in segmentation -----------------------------------------------
+    '''
+    -> seg_mode : v1 - (MSLRGR - multi-scale local reasoning and global reasoning) 
+                v2gc - (MSLR - multi-scale local reasoning) 
+                None - Base model
+    '''
+    seg_mode = 'v1'
     
-    seed_everything()  # seed all random
-    print(ver)
-    # os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
+    # Set random seed
+    seed_everything()  
+    print(ver, seg_mode)
 
     # arguments
     parser = argparse.ArgumentParser(description='MTL Scene graph and segmentation')
@@ -215,9 +267,22 @@ if __name__ == "__main__":
     # seed_everything()
     data_const = SurgicalSceneConstants()
 
-    
+    label_path = '/media/mobarak/data/lalith/sai/eval_models/labels_isi_dataset.json'
+
+    with open(label_path) as f:
+        labels = json.load(f)
+
+    CLASSES = []
+    CLASS_ID = []
+
+    for item in labels:
+        CLASSES.append(item['name'])
+        CLASS_ID.append(item['classid'])
+
+    map_dict = {k: v for k, v in zip(CLASS_ID, CLASSES)}
+
     # this is placed above the dist.init process, possibility because of the feature_extraction model.
-    model = build_model(args, load_pretrained=False)
+    model = build_model(args)
     model.set_train_test(args.model)
 
     # insert nn layers based on type.
@@ -230,10 +295,8 @@ if __name__ == "__main__":
 
     # load pre-trained stl_mtl_model
     print('Loading pre-trained weights')
-    # pretrained_model = torch.load('checkpoints/stl_sg/stl_sg/epoch_train/checkpoint_D151_epoch.pth')
-    pretrained_model = torch.load('checkpoints/amtl_t3g_sv1/amtl_t3g_sv1/epoch_train/checkpoint_D1116_epoch.pth')
-    pretrained_dict = pretrained_model['state_dict']
-    model.load_state_dict(pretrained_dict)
+    pretrained_model = torch.load('checkpoints/amtl_t0_sv1/amtl_t0_sv1/epoch_train/checkpoint_D1124_epoch.pth')
+    model.load_state_dict(pretrained_model)
     
     # Wrap the model with ddp
     model.cuda()

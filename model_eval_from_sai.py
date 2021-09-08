@@ -77,10 +77,6 @@ def build_model(args, load_pretrained = True):
     model.to(torch.device('cpu'))
     return model
 
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s_v1/stl_s_v1/epoch_train/checkpoint_D168_epoch.pth
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s_v2_gc/stl_s_v2_gc/epoch_train/checkpoint_D168_epoch.pth
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s/stl_s/epoch_train/checkpoint_D153_epoch.pth
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s_ng/stl_s_ng/epoch_train/checkpoint_D168_epoch.pth
 
 def load(args, model):
     print('Loading pre-trained weights from segmentation STL')
@@ -121,11 +117,6 @@ def batch_intersection_union(predict, target, nclass):
 
     predict = predict.cpu().numpy().astype('int64') + 1
     target = target.cpu().numpy().astype('int64') + 1
-
-    # print(predict)
-    # print("-" * 50)
-    # print(target)
-
     predict = predict * (target > 0).astype(predict.dtype)
     intersection = predict * (predict == target)
 
@@ -167,14 +158,10 @@ def eval_pass(model, test_loader, nclass=8):
 
     IoU = 1.0 * total_inter / (np.spacing(1) + total_union)
     class_values += IoU
-    # class_values /= len(test_loader)
     return class_values
 
 
 if __name__ == '__main__':
-
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s_v1/stl_s_v1/epoch_train/checkpoint_D168_epoch.pth
-    # /media/mobarak/data/lalith/mtl_scene_understanding_and_segmentation/checkpoints/stl_s_v2_gc/stl_s_v2_gc/epoch_train/checkpoint_D168_epoch.pth
     parser = argparse.ArgumentParser(description='MTL Scene graph and segmentation')
     args = parser.parse_args()
     args.use_cbs = False

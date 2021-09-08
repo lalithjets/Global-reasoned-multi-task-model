@@ -83,7 +83,7 @@ def build_model(args):
     scene_graph = AGRNN(bias=True, bn=False, dropout=0.3, multi_attn=False, layer=1, diff_edge=False, global_feat=args.global_feat)
 
     # segmentation model
-    seg_model = get_gcnet(backbone='resnet18_model')
+    seg_model = get_gcnet(backbone='resnet18_model', pretrained=True)
     model = mtl_model(seg_model.pretrained, scene_graph, seg_model.gr_interaction, seg_model.gr_decoder, seg_mode = args.seg_mode)
     model.to(torch.device('cpu'))
     return model
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     Main function to set arguments
     '''
 
-    # ---------------------------------------------- Version, model type, port, feature extraction ----------------------------------------------
+    # ---------------------------------------------- Optimization and feature sharing variants ----------------------------------------------
     '''
     Format for the model_type : X-Y 
 
@@ -407,7 +407,7 @@ if __name__ == "__main__":
     f_e = 'resnet18_11_cbs_ts'
 
 
-    #  ---------------------------------------------------------- Segmentation mode ----------------------------------------------------------
+    #  ----------------------------------------------Global reasoning variant in segmentation -----------------------------------------------
     '''
     -> seg_mode : v1 - (MSLRGR - multi-scale local reasoning and global reasoning) 
                 v2gc - (MSLR - multi-scale local reasoning) 

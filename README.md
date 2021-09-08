@@ -1,31 +1,28 @@
+# Global-Reasoned Multi-Task Model for Surgical Scene Understanding
 
-# Global-Reasoned Multi-Task Model for Surgical Scene Understanding and Instrument Segmentation
-
----
+<!---------------------------------------------------------------------------------------------------------------->
 
 
 <!---------------------------------------------------------------------------------------------------------------->
 ## Feature Extractor
-TBD
-<!---------------------------------------------------------------------------------------------------------------->
-## Global-Reasoned Segmentation Unit
-TBD
+To be added
 <!---------------------------------------------------------------------------------------------------------------->
 ## Scene graph
 <!---------------------------------------------------------------------------------------------------------------->
-TBD
+To be added
 <!---------------------------------------------------------------------------------------------------------------->
 
 ## Code Overview
 <!---------------------------------------------------------------------------------------------------------------->
-In this project, we implement our method using the Pytorch and DGL library, the structure is as follows: 
+In this project, we implement our method using the Pytorch and DGL library and there are three main folders: 
 
 - `datasets/`: Contains the dataset needed to train the network.
 - `checkpoints/`: Conatins trained weights
+- `evaluation/`: Contains utility tools for evaluation.
 - `models/`: Contains network models.
 - `utils/`: Contains utility tools used for training and evaluation.
 
----
+<!---------------------------------------------------------------------------------------------------------------->
 
 ## Library Prerequisities.
 
@@ -39,18 +36,19 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 - CUDA 10.0
 - Ubuntu 16.04
 
----
+
 ### Dataset
 #### Download feature extracted data for training and evalutation
-1. MICCAI Endoscopic Vision Challenge 2018
+1. endovis challange 2018
+2. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `datasets/word2vec` 
 
 ### Training
-TBD
+
 
 ### Evaluation
-TBD
 
----
 ### Acknowledgement
-TBD
-
+Code adopted and modified from :
+1. Visual-Semantic Graph Attention Network for Human-Object Interaction Detecion
+    - Paper [Visual-Semantic Graph Attention Network for Human-Object Interaction Detecion](https://arxiv.org/abs/2001.02302).
+    - Official Pytorch implementation [code](https://github.com/birlrobotics/vs-gats).

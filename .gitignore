@@ -12,6 +12,7 @@ results/
 venv/
 
 sai_transfer/
+process_checkpoint/
 
 tmp*
 *__pycache__
