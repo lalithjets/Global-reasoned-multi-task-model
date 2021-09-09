@@ -18,12 +18,12 @@ TBR
 TBR
 <!---------------------------------------------------------------------------------------------------------------->
 
-## Dir setup
+## Directory setup
 <!---------------------------------------------------------------------------------------------------------------->
 In this project, we implement our method using the Pytorch and DGL library, the structure is as follows: 
 
 - `dataset/`: Contains the data needed to train the network.
-- `checkpoints/`: Conatins trained weights.
+- `checkpoints/`: Contains trained weights.
 - `models/`: Contains network models.
 - `utils/`: Contains utility tools used for training and evaluation
 
@@ -34,39 +34,53 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 ### DGL
 <a href='https://docs.dgl.ai/en/latest/install/index.html'>DGL</a> is a Python package dedicated to deep learning on graphs, built atop existing tensor DL frameworks (e.g. Pytorch, MXNet) and simplifying the implementation of graph-based neural networks
 
-### Prerequisites
+### Dependencies
 - Python 3.6
 - Pytorch 1.1.0
 - DGL 0.3
 - CUDA 10.0
 - Ubuntu 16.04
----
-## Training
-### Download dataset for training
-1. Frames - endovis challange 2018
-2. Insrtument label - TBR
-3. BBox and Tool-Tissue interaction annotation - TBR
-4. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `datasets/word2vec`
 
-### Process dataset
+---
+## Data and Training
+
+### Dataset
+
+Download from **[[`Dataset Link`](https://drive.google.com/file/d/1OwWfgBZE0W5grXVaQN63VUUaTvufEmW0/view?usp=sharing)]** and place it inside `dataset/`
+1. Frames - endovis challange 2018
+2. Instrument label - TBR
+3. BBox and Tool-Tissue interaction annotation - TBR
+4. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `dataset/word2vec`
+
+
+### Process dataset (For Spatial Features)
 1. TBR
+
 ### Run training
-1. TBR
-   
+
+- Set the model_type, version for the mode to be trained according to the instructions given in the train file
+
+```bash
+python3 model_train.py
+```
+    
 ---
 ## Evaluation
 
-### Dataset
-1. Dataset - [data](https://drive.google.com/file/d/1OwWfgBZE0W5grXVaQN63VUUaTvufEmW0/view?usp=sharing) and place it inside `dataset/`
-2. checkpoints - [weights](https://drive.google.com/file/d/1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l/view?usp=sharing) and place it inside `checkpoints/`
+### Pre-trained Models
+Download from **[[`Checkpoints Link`](https://drive.google.com/file/d/1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l/view?usp=sharing)]** and place it inside `checkpoints/`  
 
-
-### Run evaluation
-1. set the following variables in (model_type, ver, seg_mode, checkpoint_dir) `evaluation.py` and run to reproduce the results.
+### Inference
+To reproduce the results, set the model_type, ver, seg_mode and checkpoint_dir based on the table given [here](https://github.com/lalithjets/Global-reasoned-multi-task-model/blob/c6668fcca712d3bd5ca25c66b11d34305103af94/evaluation.py#L195)
 - model_type
 - ver
 - seg_mode
 - checkpoint_dir
+
+```bash
+python3 evaluation.py
+```
+
 
 ---
 ## Acknowledgement
@@ -77,3 +91,8 @@ Code adopted and modified from :
 1. Graph-Based Global Reasoning Networks
     - Paper [Graph-Based Global Reasoning Networks](https://openaccess.thecvf.com/content_CVPR_2019/papers/Chen_Graph-Based_Global_Reasoning_Networks_CVPR_2019_paper.pdf).
     - Official code implementation [code](https://github.com/facebookresearch/GloRe.git).
+
+---
+## Contact
+
+For any queries, please contact [Lalithkumar](mailto:lalithjets@gmail.com) or [Sai Mitheran](mailto:saimitheran06@gmail.com)
