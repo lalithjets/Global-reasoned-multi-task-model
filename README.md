@@ -1,9 +1,19 @@
-# Global-Reasoned Multi-Task Model for Surgical Scene Understanding
-Seenivasan lalithkumar, Sai Mitheran, Mobarakol Islam, Hongliang Ren
+<div align="center">
+
+<samp>
+
+<h1> Global-Reasoned Multi-Task Model for Surgical Scene Understanding </h1>
+
+<h3> Seenivasan lalithkumar, Sai Mitheran, Mobarakol Islam, Hongliang Ren </h3>
+
+</samp>   
+
 ---
 Manuscript submitted to RA-L/ICRA 2022, under review.
 ---
 
+</div>     
+    
 ---
 
 ## Model architecture
