@@ -191,36 +191,53 @@ if __name__ == "__main__":
     Main function to set arguments
     '''
 
-    # ---------------------------------------------- Optimization and feature sharing variants ----------------------------------------------
     '''
-    Format for the model_type : X-Y 
-
-    -> X : Optimisation technique    [1. amtl - Sequential MTL Optimisation, 2. mtl - Naive MTL Optimisation]
-    -> Y : Feature Sharing mechanism [1. t0 - Base model,
-                                      2. t1 - Scene graph features to enhance segmentation (SGFSEG), 
-                                      3. t3 - Global interaction space features to improve scene graph (GISFSG)]
-
+    To reproduce the results, set the model_type, ver, seg_mode and checkpoint_dir based on the table below
+    TBR = To be released
+    ============================================================================================================
+    Paper_name              |   model_type     |        ver           |    seg_mode    |   checkpoint_dir
+    ============================================================================================================
+                                                        STL
+    ------------------------|-----------------------------------------------------------------------------------
+    VS-GAT                  |    'stl-sg'      |    'stl_sg'          |      None      |    'stl_sg'
+    SEG                     |    'stl-s'       |    'stl_s_ng'        |      TBR       |    'stl_s_ng'
+    SEG-GR                  |    'stl-s'       |    'stl_s'           |      None      |    'stl_s'
+    SEG-MSGR                |    'stl-s'       |    'stl_s_v2gc'      |     'v2gc'     |    'stl_s_v2gc'
+    SEG-MSLRGR              |    'stl-s'       |    'stl_s_v1'        |     'v1'       |    'stl_s_v1'
+    ------------------------------------------------------------------------------------------------------------
+                                                       SMTL
+    ------------------------------------------------------------------------------------------------------------
+    GR                      |    'amtl-t0'     |    'amtl_t0_s'       |      None      |    'amtl_t0_s'
+    MSGR                    |    'amtl-t0'     |    'amtl_t0_sv2gc'   |      'v2gc'    |    'amtl_t0_sv2gc'
+    MSLRGR                  |    'amtl-t0'     |    'amtl_t0_sv1'     |      'v1'      |    'amtl_t0_sv1'
+    MSLRGR-GISFSG           |    'amtl-t3'     |    'amtl_t3_sv1'     |      'v1'      |    'amtl_t3_sv1'           
+    ------------------------------------------------------------------------------------------------------------
+                                                      v-MTL
+    ------------------------------------------------------------------------------------------------------------
+    V-MTL-GR                |    'mtl-t0'      |    'mtl_t0_s         |      None      |    'mtl_t0_s'
+    ------------------------------------------------------------------------------------------------------------
+                                                        KD-MTL (set args.KD = True)
+    ------------------------------------------------------------------------------------------------------------
+    KD-MTL-GR               |    'mtl-t0'      |    'mtl_kd_t0_s'     |      None      |        TBR
+    KD-MTL-MSLRGR           |    'mtl-t0'      |    'mtl_kd_t0_sv1'   |      'v1'      |    'mtl_kd_t0_sv1'
+    KD-MTL-MSLRGR-SGFSEG    |    'mtl-t1'      |    'mtl_kd_t1_sv1'   |      'v1'      |    'mtl_kd_t1_sv1'
+    KD-MTL-MSLRGR-GISFSG    |    'mtl-t3'      |    'mtl_kd_t3_sv1'   |      'v1'      |    'mtl_kd_t3_sv1'
+    ------------------------------------------------------------------------------------------------------------
     '''
-    model_type = 'amtl-t0'
-    ver = 'amtl_t0'
-    port = '8892'
-    f_e = 'resnet18_11_cbs_ts'
 
-
-    #  ----------------------------------------------Global reasoning variant in segmentation -----------------------------------------------
-    '''
-    -> seg_mode : v1 - (MSLRGR - multi-scale local reasoning and global reasoning) 
-                v2gc - (MSLR - multi-scale local reasoning) 
-                None - Base model
-    '''
+    model_type = 'amtl-t3'
+    ver = 'amtl_t3_sv1'
     seg_mode = 'v1'
-    
+    checkpoint_dir = 'amtl_t3_sv1'
+
+    port = '8892'
+
     # Set random seed
     seed_everything()  
     print(ver, seg_mode)
 
     # arguments
-    parser = argparse.ArgumentParser(description='MTL Scene graph and segmentation')
+    parser = argparse.ArgumentParser(description='GR_MTL_SSU')
 
     # hyper parameters
     parser.add_argument('--lr',                 type=float,     default = 0.00001) #0.00001
@@ -252,13 +269,13 @@ if __name__ == "__main__":
     # data_processing
     parser.add_argument('--sampler',            type=int,       default = 0)
     parser.add_argument('--data_aug',           type=bool,      default = False)
-    parser.add_argument('--feature_extractor',  type=str,       default = f_e)
+    parser.add_argument('--feature_extractor',  type=str,       default = 'features')
     parser.add_argument('--seg_mode',           type=str,       default = seg_mode)
 
     # CBS
     parser.add_argument('--use_cbs',            type=bool,      default = False)
 
-    
+    # Knowledge distillation
     parser.add_argument('--KD',                 type=bool,      default = False)
 
     parser.add_argument('--model',              type=str,       default = model_type) 
@@ -267,8 +284,7 @@ if __name__ == "__main__":
     # seed_everything()
     data_const = SurgicalSceneConstants()
 
-    label_path = '/media/mobarak/data/lalith/sai/eval_models/labels_isi_dataset.json'
-
+    label_path = 'dataset/labels_isi_dataset.json'
     with open(label_path) as f:
         labels = json.load(f)
 
@@ -295,7 +311,7 @@ if __name__ == "__main__":
 
     # load pre-trained stl_mtl_model
     print('Loading pre-trained weights')
-    pretrained_model = torch.load('checkpoints/amtl_t0_sv1/amtl_t0_sv1/epoch_train/checkpoint_D1124_epoch.pth')
+    pretrained_model = torch.load(('checkpoints/'+checkpoint_dir+'/best_epoch.pth'))
     model.load_state_dict(pretrained_model)
     
     # Wrap the model with ddp
@@ -303,7 +319,7 @@ if __name__ == "__main__":
 
     # train and test dataloader
     val_seq = [[1, 5, 16]]
-    data_dir = ['datasets/instruments18/seq_']
+    data_dir = ['dataset/seq_']
     img_dir = ['/left_frames/']
     mask_dir = ['/annotations/']
     dset = [0]
