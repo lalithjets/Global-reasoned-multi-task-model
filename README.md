@@ -75,6 +75,8 @@ python3 model_train.py
 ---
 ## Evaluation
 
+For the direct sequence of commands to be followed, refer to [this link](https://github.com/lalithjets/Global-reasoned-multi-task-model/blob/master/eval_instructions.txt)
+
 ### Pre-trained Models
 Download from **[[`Checkpoints Link`](https://drive.google.com/file/d/1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l/view?usp=sharing)]** and place it inside `checkpoints/`  
 
