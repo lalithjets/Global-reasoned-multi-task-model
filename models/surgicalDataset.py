@@ -36,8 +36,8 @@ class SurgicalSceneConstants():
                                'Suction', 'Looping', 'Suturing', 'Clipping', 'Staple',
                                'Ultrasound_Sensing')
 
-        self.xml_data_dir = 'datasets/instruments18/seq_'
-        self.word2vec_loc = 'datasets/surgicalscene_word2vec.hdf5'
+        self.xml_data_dir = 'dataset/instruments18/seq_'
+        self.word2vec_loc = 'dataset/surgicalscene_word2vec.hdf5'
 
 
 class SurgicalSceneDataset(Dataset):
@@ -72,7 +72,7 @@ class SurgicalSceneDataset(Dataset):
             for file in domain_dir_list:
                 self.xml_dir_list.append(file)
                 self.dset.append(dset[domain])
-        self.word2vec = h5py.File('datasets/surgicalscene_word2vec.hdf5', 'r')
+        self.word2vec = h5py.File('dataset/surgicalscene_word2vec.hdf5', 'r')
 
     # Word2Vec function
     def _get_word2vec(self, node_ids, sgh=0):
