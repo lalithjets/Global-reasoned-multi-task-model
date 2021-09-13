@@ -1,0 +1,65 @@
+# ------------------------------------------------------------------------------------------------#
+                                        Steps to be followed 
+# ------------------------------------------------------------------------------------------------#
+
+
+1. git clone https://github.com/lalithjets/Global-reasoned-multi-task-model.git
+2. cd Global-reasoned-multi-task-model/
+
+
+# ------------------------- Download Commands ------------------------- #
+
+# ------------------------- Checkpoints ------------------------- #
+Link : https://drive.google.com/file/d/1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l/view?usp=sharing
+
+Command : (GDrive wget download - Optional) - Can be downloaded manually and placed in root
+> 3. wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1HTSYta_Dn9-nF1Df4TUym38Nu0VMtl5l" -O gr_mtl_ssu_checkpoints.zip && rm -rf /tmp/cookies.txt
+
+4. unzip gr_mtl_ssu_checkpoints.zip
+5. rm gr_mtl_ssu_checkpoints.zip
+
+# ------------------------- Dataset ------------------------- #
+Link : https://drive.google.com/file/d/1OwWfgBZE0W5grXVaQN63VUUaTvufEmW0/view?usp=sharing
+
+Command : (GDrive wget download - Optional) - Can be downloaded manually and placed in root
+> 6. wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1OwWfgBZE0W5grXVaQN63VUUaTvufEmW0' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1OwWfgBZE0W5grXVaQN63VUUaTvufEmW0" -O gr_mtl_ssu_dataset.zip && rm -rf /tmp/cookies.txt
+
+7. unzip gr_mtl_ssu_dataset.zip
+8. rm gr_mtl_ssu_dataset.zip
+
+9. Set the model_type, ver, seg_mode and checkpoint_dir in evaluation.py as given in instructions
+
+# ------------------------- Run the command for Evaluation ------------------------- #
+10. CUDA_VISIBLE_DEVICES=1 python3 evaluation.py
+
+
+# --------------------------------------------- Sample Output --------------------------------------------- #
+
+Settings : 
+
+    model_type = 'amtl-t0'
+    ver = 'amtl_t0_sv1'
+    seg_mode = 'v1'
+    checkpoint_dir = 'amtl_t0_sv1'
+
+# ------------------------------------------------------------------------------------------------#
+                                                Output 
+# ------------------------------------------------------------------------------------------------#
+
+================= Evaluation ====================
+Graph        :  acc: 0.7003  map: 0.2885 recall: 0.3096  loss: 0.3764}
+Segmentation : Pacc: 0.9638 mIoU: 0.4354   loss: 0.1500}
+
+================= Class-wise IoU ====================
+Mean Value:  0.435358693711956 
+
+| Class                     |        IoU |
+|---------------------------+------------|
+| Background                | 0.971428   |
+| Bipolar_Forceps           | 0.696591   |
+| Prograsp_Forceps          | 0.435617   |
+| Large_Needle_Driver       | 0.00154275 |
+| Monopolar_Curved_Scissors | 0.871583   |
+| Ultrasound_Probe          | 0.120284   |
+| Suction_Instrument        | 0.347132   |
+| Clip_Applier              | 0.0386921  |
