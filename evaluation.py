@@ -210,7 +210,7 @@ if __name__ == "__main__":
     GR                      |    'amtl-t0'     |    'amtl_t0_s'       |      None      |    'amtl_t0_s'
     MSGR                    |    'amtl-t0'     |    'amtl_t0_sv2gc'   |      'v2gc'    |    'amtl_t0_sv2gc'
     MSLRGR                  |    'amtl-t0'     |    'amtl_t0_sv1'     |      'v1'      |    'amtl_t0_sv1'
-    MSLRGR-GISFSG           |    'amtl-t3'     |    'amtl_t3_sv1'     |      'v1'      |    'amtl_t3_sv1'           
+    MSLRGR-GISFSG           |    'amtl-t3'     |    'amtl_t3pn_sv1'   |      'v1'      |    'amtl_t3pn_sv1'          
     ------------------------------------------------------------------------------------------------------------
                                                       v-MTL
     ------------------------------------------------------------------------------------------------------------
