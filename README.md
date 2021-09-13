@@ -51,6 +51,16 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 - CUDA 10.0
 - Ubuntu 16.04
 
+## Setup (From an Env File)
+
+We have provided environment files for installation using conda
+
+### Using Conda
+
+```bash
+conda env create -f environment.yml
+```
+
 ---
 ## Data and Training
 
