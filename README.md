@@ -44,11 +44,11 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 ### DGL
 <a href='https://docs.dgl.ai/en/latest/install/index.html'>DGL</a> is a Python package dedicated to deep learning on graphs, built atop existing tensor DL frameworks (e.g. Pytorch, MXNet) and simplifying the implementation of graph-based neural networks
 
-### Dependencies
+### Dependencies (Used for Experiments)
 - Python 3.6
-- Pytorch 1.1.0
-- DGL 0.3
-- CUDA 10.0
+- Pytorch 1.7.1
+- DGL 0.4.2
+- CUDA 10.2
 - Ubuntu 16.04
 
 ## Setup (From an Env File)
