@@ -63,3 +63,117 @@ Mean Value:  0.435358693711956
 | Ultrasound_Probe          | 0.120284   |
 | Suction_Instrument        | 0.347132   |
 | Clip_Applier              | 0.0386921  |
+
+
+
+# ------------------------------------------------------------------------------------------------#
+                                        Eval Repository Structure 
+# ------------------------------------------------------------------------------------------------#
+
+├── checkpoints
+│   ├── amtl_t0_s
+│   │   └── best_epoch.pth
+│   ├── amtl_t0_sv1
+│   │   └── best_epoch.pth
+│   ├── amtl_t0_sv2gc
+│   │   └── best_epoch.pth
+│   ├── amtl_t3g_sv1
+│   │   └── best_epoch.pth
+│   ├── amtl_t3pn_sv1
+│   │   └── best_epoch.pth
+│   ├── mtl_kd_t0_s
+│   │   └── best_epoch.pth
+│   ├── mtl_kd_t0_sv1
+│   │   └── best_epoch.pth
+│   ├── mtl_kd_t1_sv1
+│   │   └── best_epoch.pth
+│   ├── mtl_kd_t3g_sv1
+│   │   └── best_epoch.pth
+│   ├── stl_s
+│   │   └── best_epoch.pth
+│   ├── stl_sg
+│   │   └── best_epoch.pth
+│   ├── stl_s_ng
+│   │   └── best_epoch.pth
+│   ├── stl_s_v1
+│   │   └── best_epoch.pth
+│   └── stl_s_v2gc
+│       └── best_epoch.pth
+├── dataset
+│   ├── labels_isi_dataset.json
+│   ├── seq_1
+│   │   ├── annotations
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── left_frames
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── vsgat
+│   │   │   └── features
+│   │   │       ├── frame000_features.hdf5
+│   │   │       ├── ...
+│   │   └── xml
+│   │       ├── frame000.xml
+│   │       ├── ...
+│   ├── seq_16
+│   │   ├── annotations
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── left_frames
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── vsgat
+│   │   │   └── features
+│   │   │       ├── frame000_features.hdf5
+│   │   │       ├── ...
+│   │   └── xml
+│   │       ├── frame000.xml
+│   │       ├── ...
+│   ├── seq_5
+│   │   ├── annotations
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── left_frames
+│   │   │   ├── frame000.png
+│   │   │   ├── ...
+│   │   ├── vsgat
+│   │   │   └── features
+│   │   │       ├── frame000_features.hdf5
+│   │   │       ├── ...
+│   │   └── xml
+│   │       ├── frame000.xml
+│   │       ├── ...    
+│   └── surgicalscene_word2vec.hdf5
+├── environment.yml
+├── evaluation.py
+├── eval_instructions.txt
+├── figures
+│   ├── figure_1.pdf
+│   ├── figure_2.pdf
+│   ├── figure_3.pdf
+│   ├── figure_4.pdf
+│   └── figure_5.pdf
+├── models
+│   ├── mtl_model.py
+│   ├── __pycache__
+│   │   ├── mtl_model.cpython-36.pyc
+│   │   ├── scene_graph.cpython-36.pyc
+│   │   ├── segmentation_model.cpython-36.pyc
+│   │   └── surgicalDataset.cpython-36.pyc
+│   ├── scene_graph.py
+│   ├── segmentation_model.py
+│   └── surgicalDataset.py
+├── model_train.py
+├── README.md
+├── result_logs
+│   ├── results_combined
+│   └── results_kd.txt
+└── utils
+    ├── io.py
+    ├── __pycache__
+    │   ├── scene_graph_eval_matrix.cpython-36.pyc
+    │   └── segmentation_eval_matrix.cpython-36.pyc
+    ├── scene_graph_eval_matrix.py
+    ├── segmentation_eval_matrix.py
+    ├── utils.py
+    └── vis_tool.py
