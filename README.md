@@ -2,32 +2,40 @@
 
 <samp>
 
-<h1> Global-Reasoned Multi-Task Model for Surgical Scene Understanding </h1>
+<h2> Global-Reasoned Multi-Task Model for Surgical Scene Understanding </h1>
 
-<h3> Seenivasan lalithkumar, Sai Mitheran, Mobarakol Islam, Hongliang Ren </h3>
+<h4> Seenivasan lalithkumar, Sai Mitheran, Mobarakol Islam, Hongliang Ren </h3>
 
 </samp>   
 
 ---
-Manuscript submitted to RA-L/ICRA 2022, under review.
+| **[ [```arXiv```](<https://arxiv.org/abs/2201.11957>) ]** |**[ [```Paper```](<https://ieeexplore.ieee.org/document/9695281>) ]** |
+|:-------------------:|:-------------------:|
+    
+ICRA 2022, IEEE Robotics and Automation Letters (RA-L)
 ---
 
 </div>     
     
 ---
 
-## Model architecture
-### Feature Extractor
-TBR
-<!---------------------------------------------------------------------------------------------------------------->
-### Global-Reasoned Segmentation Unit
-TBR
-<!---------------------------------------------------------------------------------------------------------------->
-### Scene graph
-<!---------------------------------------------------------------------------------------------------------------->
-TBR
-<!---------------------------------------------------------------------------------------------------------------->
+## Introduction
+Global and local relational reasoning enable scene understanding models to perform human-like scene analysis and understanding. Scene understanding enables better semantic segmentation and object-to-object interaction detection. In the medical domain, a robust surgical scene understanding model allows the automation of surgical skill evaluation, real-time monitoring of surgeon’s performance and post-surgical analysis. This paper introduces a globally-reasoned multi-task surgical scene understanding model capable of performing instrument segmentation and tool-tissue interaction detection. Here, we incorporate global relational reasoning in the latent interaction space and introduce multi-scale local (neighborhood) reasoning in the coordinate space to improve segmentation. Utilizing the multi-task model setup, the performance of the visual-semantic graph attention network in interaction detection is further enhanced through global reasoning. The global interaction space features from the segmentation module are introduced into the graph network, allowing it to detect interactions based on both node-to-node and global interaction reasoning. Our model reduces the computation cost compared to running two independent single-task models by sharing common modules, which is indispensable for practical applications. Using a sequential optimization technique, the proposed multi-task model outperforms other state-of-the-art single-task models on the MICCAI endoscopic vision challenge 2018 dataset. Additionally, we also observe the performance of the multi-task model when trained using the knowledge distillation technique.
+    
+## Method
+    
+![framework](figures/figure_2.jpg)
 
+The proposed network architecture. The proposed globally-reasoned multi-task scene understanding model consists of a shared feature extractor. The segmentation module performs latent global reasoning (GloRe unit [2]) and local reasoning (multi-scale local reasoning) to segment instruments. To detect tool interaction, the scene graph (tool interaction detection) model incorporates the global interaction space features to further improve the performance of the visual-semantic graph attention network [1].
+    
+## Feature Sharing
+ 
+<p align="center">
+<img src="figures/figure_4.jpg" alt="features" width="500"/>
+</p>
+    
+Variants of feature sharing between the segmentation and scene graph modules in multi-task setting to improve single-task performance
+    
 ## Directory setup
 <!---------------------------------------------------------------------------------------------------------------->
 In this project, we implement our method using the Pytorch and DGL library, the structure is as follows: 
