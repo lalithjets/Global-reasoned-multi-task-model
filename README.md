@@ -21,7 +21,7 @@ ICRA 2022, IEEE Robotics and Automation Letters (RA-L)
 
 If you find our code or paper useful, please cite as
 
-```bash
+```bibtex
 @ARTICLE{9695281,  
     author={Seenivasan, Lalithkumar and Mitheran, Sai and Islam, Mobarakol and Ren, Hongliang},  
     journal={IEEE Robotics and Automation Letters},   
