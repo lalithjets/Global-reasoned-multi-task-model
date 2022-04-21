@@ -22,15 +22,13 @@ ICRA 2022, IEEE Robotics and Automation Letters (RA-L)
 If you find our code or paper useful, please cite as
 
 ```bibtex
-@ARTICLE{9695281,  
-    author={Seenivasan, Lalithkumar and Mitheran, Sai and Islam, Mobarakol and Ren, Hongliang},  
-    journal={IEEE Robotics and Automation Letters},   
-    title={Global-Reasoned Multi-Task Learning Model for Surgical Scene Understanding},   
-    year={2022},  
-    volume={},  
-    number={},  
-    pages={1-1},  
-    doi={10.1109/LRA.2022.3146544}}
+@article{seenivasan2022global,
+  title={Global-Reasoned Multi-Task Learning Model for Surgical Scene Understanding},
+  author={Seenivasan, Lalithkumar and Mitheran, Sai and Islam, Mobarakol and Ren, Hongliang},
+  journal={IEEE Robotics and Automation Letters},
+  year={2022},
+  publisher={IEEE}
+}
 ```
     
 ## Introduction
