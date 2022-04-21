@@ -9,8 +9,8 @@
 </samp>   
 
 ---
-| **[ [```arXiv```](<https://arxiv.org/abs/2201.11957>) ]** |**[ [```Paper```](<https://ieeexplore.ieee.org/document/9695281>) ]** |
-|:-------------------:|:-------------------:|
+| **[ [```arXiv```](<https://arxiv.org/abs/2201.11957>) ]** |**[ [```Paper```](<https://ieeexplore.ieee.org/document/9695281>) ]** |**[ [```YouTube```](<https://youtu.be/UOIcp3y4o1U>) ]** |
+|:-------------------:|:-------------------:|:-------------------:|
     
 ICRA 2022, IEEE Robotics and Automation Letters (RA-L)
 ---
