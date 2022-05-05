@@ -9,15 +9,13 @@
 </samp>   
 
 ---
+    
 | **[ [```arXiv```](<https://arxiv.org/abs/2201.11957>) ]** |**[ [```Paper```](<https://ieeexplore.ieee.org/document/9695281>) ]** |**[ [```YouTube```](<https://youtu.be/UOIcp3y4o1U>) ]** |
 |:-------------------:|:-------------------:|:-------------------:|
     
 ICRA 2022, IEEE Robotics and Automation Letters (RA-L)
----
 
-</div>     
-    
----
+</div>
 
 If you find our code or paper useful, please cite as
 
@@ -31,6 +29,8 @@ If you find our code or paper useful, please cite as
 }
 ```
     
+---
+
 ## Introduction
 Global and local relational reasoning enable scene understanding models to perform human-like scene analysis and understanding. Scene understanding enables better semantic segmentation and object-to-object interaction detection. In the medical domain, a robust surgical scene understanding model allows the automation of surgical skill evaluation, real-time monitoring of surgeon’s performance and post-surgical analysis. This paper introduces a globally-reasoned multi-task surgical scene understanding model capable of performing instrument segmentation and tool-tissue interaction detection. Here, we incorporate global relational reasoning in the latent interaction space and introduce multi-scale local (neighborhood) reasoning in the coordinate space to improve segmentation. Utilizing the multi-task model setup, the performance of the visual-semantic graph attention network in interaction detection is further enhanced through global reasoning. The global interaction space features from the segmentation module are introduced into the graph network, allowing it to detect interactions based on both node-to-node and global interaction reasoning. Our model reduces the computation cost compared to running two independent single-task models by sharing common modules, which is indispensable for practical applications. Using a sequential optimization technique, the proposed multi-task model outperforms other state-of-the-art single-task models on the MICCAI endoscopic vision challenge 2018 dataset. Additionally, we also observe the performance of the multi-task model when trained using the knowledge distillation technique.
     
@@ -40,13 +40,15 @@ Global and local relational reasoning enable scene understanding models to perfo
 
 The proposed network architecture. The proposed globally-reasoned multi-task scene understanding model consists of a shared feature extractor. The segmentation module performs latent global reasoning (GloRe unit [2]) and local reasoning (multi-scale local reasoning) to segment instruments. To detect tool interaction, the scene graph (tool interaction detection) model incorporates the global interaction space features to further improve the performance of the visual-semantic graph attention network [1].
     
-## Feature Sharing
+### Feature Sharing
  
 <p align="center">
 <img src="figures/figure_4.jpg" alt="features" width="500"/>
 </p>
     
 Variants of feature sharing between the segmentation and scene graph modules in multi-task setting to improve single-task performance
+
+--- 
     
 ## Directory setup
 <!---------------------------------------------------------------------------------------------------------------->
@@ -55,12 +57,12 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 - `dataset/`: Contains the data needed to train the network.
 - `checkpoints/`: Contains trained weights.
 - `models/`: Contains network models.
-- `utils/`: Contains utility tools used for training and evaluation
-
+- `utils/`: Contains utility tools used for training and evaluation.
+    
 ---
 
 ## Library Prerequisities
-
+    
 ### DGL
 <a href='https://docs.dgl.ai/en/latest/install/index.html'>DGL</a> is a Python package dedicated to deep learning on graphs, built atop existing tensor DL frameworks (e.g. Pytorch, MXNet) and simplifying the implementation of graph-based neural networks
 
@@ -70,7 +72,9 @@ In this project, we implement our method using the Pytorch and DGL library, the 
 - DGL 0.4.2
 - CUDA 10.2
 - Ubuntu 16.04
-
+    
+---
+    
 ## Setup (From an Env File)
 
 We have provided environment files for installation using conda
@@ -82,20 +86,20 @@ conda env create -f environment.yml
 ```
 
 ---
-## Data and Training
-
-### Dataset - Train (TBR)
-1. Frames - endovis challange 2018
-2. Instrument label - TBR
-3. BBox and Tool-Tissue interaction annotation - TBR
+    
+## Dataset:
+1. Frames - Left camera images from [2018 robotic scene segmentation challenge](https://arxiv.org/pdf/2001.11190.pdf) are used in this work.
+2. Instrument label - To be released!
+3. BBox and Tool-Tissue interaction annotation - [Our annotations](https://drive.google.com/file/d/16G_Pf4E9KjVq7j_7BfBKHg0NyQQ0oTxP/view?usp=sharing) (Cite this paper / [our previous work](https://link.springer.com/chapter/10.1007/978-3-030-59716-0_60) when using these annotations.)
 4. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `dataset/word2vec`
 
-
+---
+    
+## Training
 ### Process dataset (For Spatial Features)
-1. TBR
+- To be released!
 
 ### Run training
-
 - Set the model_type, version for the mode to be trained according to the instructions given in the train file
 
 ```bash
@@ -104,7 +108,6 @@ python3 model_train.py
     
 ---
 ## Evaluation
-
 For the direct sequence of commands to be followed, refer to [this link](https://github.com/lalithjets/Global-reasoned-multi-task-model/blob/master/eval_instructions.txt)
 
 ### Pre-trained Models
@@ -125,6 +128,7 @@ python3 evaluation.py
 ```
 
 ---
+    
 ## Acknowledgement
 Code adopted and modified from :
 1. Visual-Semantic Graph Attention Network for Human-Object Interaction Detecion
@@ -135,6 +139,12 @@ Code adopted and modified from :
     - Official code implementation [code](https://github.com/facebookresearch/GloRe.git).
 
 ---
+
+## Other Works:
+1. Learning and Reasoning with the Graph Structure Representation in Robotic Surgery| **[ [```arXiv```](<https://arxiv.org/pdf/2007.03357.pdf>) ]** |**[ [```Paper```](<https://link.springer.com/chapter/10.1007/978-3-030-59716-0_60>) ]** |
+    
+---
+
 ## Contact
 
 For any queries, please contact [Lalithkumar](mailto:lalithjets@gmail.com) or [Sai Mitheran](mailto:saimitheran06@gmail.com)
